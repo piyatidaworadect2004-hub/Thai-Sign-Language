@@ -270,6 +270,15 @@ export default function Practice() {
                 คำศัพท์ ID : {id}
             </p>
 
+            <a
+                href="https://dic.ttrs.or.th/video/view/61c5797966b04b724e244611"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 mt-4 bg-blue-500 text-white px-5 py-2 rounded-xl hover:bg-blue-600 transition"
+            >
+                ดูตัวอย่างท่าจาก TTRS
+            </a>
+
             <div className="relative max-w-3xl mt-8">
 
                 <video
@@ -311,7 +320,7 @@ export default function Practice() {
                     </p>
 
                     <p className="mt-2 text-lg">
-                        ความมั่นใจ : {(confidence * 100).toFixed(2)}%
+                        ค่าความมั่นใจ : {(confidence * 100).toFixed(2)}%
                     </p>
 
                 </div>
