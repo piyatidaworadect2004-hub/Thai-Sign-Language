@@ -267,7 +267,7 @@ export default function Practice() {
             </h1>
 
             <p className="text-xl mt-4">
-                คำศัพท์ ID : {id}
+                สวัสดี ID : {id}
             </p>
 
             <a
@@ -278,6 +278,7 @@ export default function Practice() {
             >
                 ดูตัวอย่างท่าจาก TTRS
             </a>
+            
 
             <div className="relative max-w-3xl mt-8">
 
