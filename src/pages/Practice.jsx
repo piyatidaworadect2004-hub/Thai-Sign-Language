@@ -5,9 +5,9 @@ import {
     FilesetResolver,
     HandLandmarker,
 } from "@mediapipe/tasks-vision";
-
+ //น้องแตมเตย
 const HAND_CONNECTIONS = [
-    [0, 1], [1, 2], [2, 3], [3, 4],
+    [0, 2], [1, 2], [2, 3], [3, 4],
     [0, 5], [5, 6], [6, 7], [7, 8],
     [5, 9], [9, 10], [10, 11], [11, 12],
     [9, 13], [13, 14], [14, 15], [15, 16],
