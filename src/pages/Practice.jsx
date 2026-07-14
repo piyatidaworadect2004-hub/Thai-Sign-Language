@@ -28,6 +28,7 @@ export default function Practice() {
 
     const [prediction, setPrediction] = useState("");
     const [confidence, setConfidence] = useState(0);
+    const [debug, setDebug] = useState("");
 
     const lastPredictTime = useRef(0);
 
@@ -35,8 +36,7 @@ export default function Practice() {
     // ส่งข้อมูลไป AI
     // ==========================
 
-    async function predictSign(handData) {
-
+    async function predictSign(handData, worldHandData) {
         try {
 
             const response = await fetch(
@@ -48,6 +48,7 @@ export default function Practice() {
                     },
                     body: JSON.stringify({
                         landmarks: handData,
+                        worldLandmarks: worldHandData,
                     }),
                 }
             );
@@ -120,6 +121,10 @@ export default function Practice() {
                                 Date.now()
                             );
 
+                        console.log(results);
+                        console.log("Landmarks:", results.landmarks);
+                        console.log("WorldLandmarks:", results.worldLandmarks);
+
                         const canvas = canvasRef.current;
                         const ctx = canvas.getContext("2d");
 
@@ -139,19 +144,37 @@ export default function Practice() {
                         ) {
 
                             setHandDetected(true);
+                            const landmarks = results.landmarks[0];
 
-                            const landmarks =
-                                results.landmarks[0];
+                            const worldLandmarks =
+                                results.worldLandmarks &&
+                                    results.worldLandmarks.length > 0
+                                    ? results.worldLandmarks[0]
+                                    : [];
 
                             const handData = [];
+                            const worldHandData = [];
 
+                            // Landmarks (Normalized)
                             landmarks.forEach((point) => {
-
                                 handData.push(point.x);
                                 handData.push(point.y);
                                 handData.push(point.z);
-
                             });
+
+                            // World Landmarks (3D)
+                            worldLandmarks.forEach((point) => {
+                                worldHandData.push(point.x);
+                                worldHandData.push(point.y);
+                                worldHandData.push(point.z);
+                            });
+
+                            // Debug
+                            if (worldLandmarks.length > 0) {
+                                setDebug("✅ พบ World Landmarks");
+                            } else {
+                                setDebug("❌ ไม่พบ World Landmarks");
+                            }
 
                             const now = Date.now();
 
@@ -161,7 +184,7 @@ export default function Practice() {
 
                                 lastPredictTime.current = now;
 
-                                predictSign(handData);
+                                predictSign(handData, worldHandData);
 
                             }
 
@@ -213,6 +236,7 @@ export default function Practice() {
                             setHandDetected(false);
                             setPrediction("");
                             setConfidence(0);
+                            setDebug("");
 
                         }
 
@@ -267,7 +291,8 @@ export default function Practice() {
             </h1>
 
             <p className="text-xl mt-4">
-                คำศัพท์ ID : {id}
+                สวัสดี ID : {id}
+
             </p>
 
             <a
@@ -278,6 +303,7 @@ export default function Practice() {
             >
                 ดูตัวอย่างท่าจาก TTRS
             </a>
+
 
             <div className="relative max-w-3xl mt-8">
 
@@ -304,6 +330,12 @@ export default function Practice() {
             {handDetected && (
                 <p className="mt-2 text-blue-600 font-bold">
                     🤟 ตรวจพบมือ
+                </p>
+            )}
+
+            {debug && (
+                <p className="mt-2 text-purple-600 font-bold">
+                    {debug}
                 </p>
             )}
 

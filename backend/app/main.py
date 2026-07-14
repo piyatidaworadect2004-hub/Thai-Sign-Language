@@ -1,20 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.database import engine, Base
+from app.routers import auth
 from pydantic import BaseModel
 import random
 
-app = FastAPI()
 
-# เปิดให้ React เรียก API ได้
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="My Backend Service")
+
+# จัดการเรื่อง CORS หากต้องเชื่อมต่อกับ React หน้าบ้าน
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173"
-    ],
+    allow_origins=["*"], # ในงานจริงระบุเป็นที่อยู่หน้าบ้าน เช่น ["http://localhost:3000"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
 
 # ----------------------------
 # ข้อมูลหมวดหมู่
@@ -166,6 +172,6 @@ def predict(data: PredictRequest):
     ]
 
     return {
-        "word": model.predict(...),
+        "word": random.choice(labels),
         "confidence": round(random.uniform(0.85, 0.99), 2)
     }
