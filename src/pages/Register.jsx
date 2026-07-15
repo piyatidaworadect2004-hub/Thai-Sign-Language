@@ -16,7 +16,7 @@ const handleRegister = async()=>{
 
 
 const response = await fetch(
-"http://localhost:5000/api/register",
+"http://localhost:8000/api/register",
 {
 method:"POST",
 headers:{

@@ -9,10 +9,28 @@ export default function Home() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/categories")
-      .then((res) => res.json())
+    // 🚀 1. ดึง Token ออกมาจากเครื่องคอมพิวเตอร์ของ User ปัจจุบัน
+    const token = localStorage.getItem("token");
+
+    // 🚀 2. ทำการยื่นคำขอไปยัง Backend พร้อมแนบ Token ไปใน Headers
+    fetch("http://127.0.0.1:8000/categories", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        // ส่ง Header สำคัญชื่อ Authorization พร้อมค่า Bearer + token ของเรา
+        "Authorization": `Bearer ${token}`
+      }
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => setCategories(data))
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error("ดึงข้อมูลล้มเหลว:", err);
+      });
   }, []);
 
   return (
