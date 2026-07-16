@@ -267,7 +267,7 @@ export default function Practice() {
             </h1>
 
             <p className="text-xl mt-4">
-                สวัสดี ID : {id}
+                คำศัพท์ ID : {id}
             </p>
 
             <a
@@ -276,7 +276,7 @@ export default function Practice() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 mt-4 bg-blue-500 text-white px-5 py-2 rounded-xl hover:bg-blue-600 transition"
             >
-                ดูตัวอย่างท่าจาก TTRS
+                ดูตัวอย่างท่าภาษามือจาก TTRS
             </a>
             
 
