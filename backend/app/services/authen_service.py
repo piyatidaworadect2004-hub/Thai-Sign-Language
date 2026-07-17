@@ -2,33 +2,39 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import hashlib
 
-# คีย์ลับสำหรับสร้าง JWT Token (ควรย้ายไปไว้ใน .env ในขั้นตอนถัดไป)
+# คีย์ลับสำหรับสร้าง JWT Token
 SECRET_KEY = "SUPER_SECRET_KEY_NEVER_SHARE_THIS_IN_PRODUCTION"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# 💡 เปลี่ยนมาใช้ pbkdf2_sha256 แทน bcrypt เพื่อเลี่ยงบั๊ก library บน Windows
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # ฟังก์ชันเข้ารหัส Password ก่อนบันทึก
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-import hashlib
-
-# ฟังก์ชันเช็กความถูกต้องของ Password ตอน Login
+# ฟังก์ชันเช็กความถูกต้องของ Password ตอน Login (รองรับทุกกรณีรวมถึง SHA-256 ดั้งเดิม)
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
+        # ลองตรวจสอบด้วย pbkdf2_sha256 ก่อน
         return pwd_context.verify(plain_password, hashed_password)
     except Exception:
-        # Fallback if hashed_password in DB is not a valid bcrypt hash
-        # Case 1: Already hashed SHA-256 password matches directly
+        # 💡 Fallback หากรหัสผ่านเดิมใน DB ไม่ใช่ Format ของ pbkdf2_sha256
+        
+        # กรณีที่ 1: รหัสผ่านตรงกันดั้งเดิม (Plain text)
         if plain_password == hashed_password:
             return True
-        # Case 2: Plain password matches SHA-256 hash in DB
+            
+        # กรณีที่ 2: รหัสผ่านเดิมเป็นแบบ SHA-256
         sha256_hash = hashlib.sha256(plain_password.encode("utf-8")).hexdigest()
         if sha256_hash == hashed_password:
             return True
+            
+        # กรณีที่ 3: หากคุณเคยสมัครผ่าน bcrypt ไปก่อนหน้านี้ แล้วตัวตรวจสอบพัง 
+        # เราจะไม่ปล่อยให้ระบบแครช แต่จะคืนค่า False เพื่อให้กรอกใหม่แทน
         return False
 
 # ฟังก์ชันสร้าง JWT Token

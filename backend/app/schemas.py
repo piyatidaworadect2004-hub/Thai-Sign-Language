@@ -1,6 +1,11 @@
-# app/schemas.py
+# backend/app/schemas.py
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+
+# 💡 คลาสสำหรับรองรับการส่งข้อมูล Login แบบ JSON จากหน้าบ้าน React
+class UserLoginRequest(BaseModel):
+    username: str
+    password: str
 
 # โครงสร้างพื้นฐานของ User
 class UserBase(BaseModel):

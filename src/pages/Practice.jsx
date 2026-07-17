@@ -39,19 +39,19 @@ export default function Practice() {
     async function predictSign(handData, worldHandData) {
         try {
 
-            const response = await fetch(
-                "http://127.0.0.1:8000/predict",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        landmarks: handData,
-                        worldLandmarks: worldHandData,
-                    }),
-                }
-            );
+            const response = await fetch("http://localhost:8000/auth/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password,
+                    full_name: username,
+                    role: "user"
+                })
+            });
 
             if (!response.ok) return;
 
