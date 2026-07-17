@@ -7,10 +7,12 @@ from app.routers import auth
 from pydantic import BaseModel
 import random
 
-# 🚀 ตอนนี้เปิดใช้งานบรรทัดนี้ได้แล้ว! เพราะเราสร้างฟังก์ชันไว้ใน auth.py แล้ว
-from app.routers.auth import get_current_user 
+# 💡 Import ตัว User จาก SQLModel และ SQLModel เองเข้ามาใช้งานร่วมกับ Base
+from sqlmodel import SQLModel
+from app.models import User, Category
+from app.routers.auth import get_current_user
 
-# โครงสร้างตารางสำหรับเก็บ Progress 
+# โครงสร้างตารางสำหรับเก็บ Progress (ผูกกับ Base ดั้งเดิม)
 class UserProgress(Base):
     __tablename__ = "user_progress"
 
@@ -19,10 +21,15 @@ class UserProgress(Base):
     category_id = Column(Integer, nullable=False)
     progress = Column(Integer, default=0)
 
-Base.metadata.create_all(bind=engine)
+# ==========================================
+# 🚨 สั่งสร้างตารางคู่กัน ทั้ง SQLModel และ Base ดั้งเดิม
+# ==========================================
+SQLModel.metadata.create_all(bind=engine) # สร้างตาราง users, categories ของ SQLModel
+Base.metadata.create_all(bind=engine)     # สร้างตาราง user_progress ของ SQLAlchemy Base
 
 app = FastAPI(title="My Backend Service")
 
+# เปิดสิทธิ์ CORS ให้เข้าถึงได้หมด
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -55,16 +62,14 @@ words = [
 def home():
     return {"message": "API is running"}
 
-# 🚀 ทำงานแบบ Multi-user สมบูรณ์แบบ
+# ทำงานแบบ Multi-user สมบูรณ์แบบ
 @app.get("/categories")
 def get_categories(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user) # ดัก Token สำเร็จแล้ว!
+    current_user: dict = Depends(get_current_user)
 ):
-    # ดึง id จากคนที่ส่ง Token มา
     user_id = current_user.id
     
-    # ดึงคะแนนความก้าวหน้าเฉพาะของคนนี้จาก PostgreSQL
     db_progress = db.query(UserProgress).filter(UserProgress.user_id == user_id).all()
     progress_map = {p.category_id: p.progress for p in db_progress}
 

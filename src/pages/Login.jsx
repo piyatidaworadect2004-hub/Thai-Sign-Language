@@ -11,6 +11,7 @@ export default function Login() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
 
+    // Login.jsx
     const handleLogin = async () => {
         if (!username.trim() || !password.trim()) {
             alert("กรุณากรอก Username และ Password");
@@ -18,37 +19,33 @@ export default function Login() {
         }
 
         try {
-            const formData = new URLSearchParams();
-            formData.append("username", username);
-            formData.append("password", SHA256(password).toString());
-            console.log("Form Data:", formData.toString()); // Debug: Log the form data
-            const response = await fetch(
-                "http://localhost:8000/auth/login",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: formData,
-                }
-            );
-            console.log("Response Status:", response.status); // Debug: Log the response status
+            const response = await fetch("http://localhost:8000/auth/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json", // ปรับเป็น JSON
+                },
+                // ส่งข้อมูลเป็น Object ตรงๆ แล้วแปลงเป็น String
+                body: JSON.stringify({
+                    username: username,
+                    password:password
+                }),
+            });
+
             const data = await response.json();
 
             if (response.ok) {
                 localStorage.setItem("token", data.access_token);
                 alert("เข้าสู่ระบบสำเร็จ!");
-                 navigate("/home");
+                navigate("/home");
             } else {
-                alert(data.detail || "Username หรือ Password ไม่ถูกต้อง");
+                // แสดง error ให้ชัดเจน
+                alert(data.detail || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
             }
-
         } catch (error) {
             console.error(error);
-            alert("เชื่อมต่อ Server ไม่ได้");
+            alert("ไม่สามารถเชื่อมต่อกับ Server ได้");
         }
     };
-
     return (
         <div className="login-container">
             <h1>Login</h1>

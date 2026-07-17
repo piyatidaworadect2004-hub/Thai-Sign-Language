@@ -1,50 +1,86 @@
-/* Login.css */
+/* Login.css - ปรับปรุงโครงสร้างคลาสเดิมให้เป็นมินิมอลโค้งมน */
+
 .login-container {
     display: flex;
     flex-direction: column;
-    width: 320px;
-    margin: 100px auto;
-    gap: 12px;
+    width: 100%;
+    max-width: 380px; /* ปรับขนาดให้สมส่วนตาม Figma */
+    margin: 60px auto;
+    padding: 40px 30px;
+    background-color: #F7F2EB; /* สีครีมมินิมอล */
+    border-radius: 40px; /* โค้งมนสูงพรีเมียม */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    gap: 16px;
+    box-sizing: border-box;
 }
 
+/* ตกแต่งหัวข้อ */
 .login-container h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111111;
     text-align: center;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
+/* ช่องกรอก Input ทุกช่อง (ทั้งหน้า Login และ Register) */
 .login-container input {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    width: 100%;
+    padding: 14px 20px;
+    background-color: #ffffff; /* กล่องพิมพ์สีขาว */
+    border: 1px solid transparent;
+    border-radius: 22px; /* โค้งมนนุ่มนวล */
     font-size: 14px;
+    color: #111111;
+    outline: none;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.01);
+    box-sizing: border-box;
+    transition: all 0.2s ease;
 }
 
+/* ตอนกดคลิกพิมพ์ข้อความ */
+.login-container input:focus {
+    border-color: #BAD6EB; /* ไฮไลท์ขอบสีฟ้าพาสเทล */
+}
+
+/* ปุ่มหลัก: ปุ่มเข้าสู่ระบบ / ปุ่มยืนยันสมัครสมาชิก */
 .btn-login {
-    background-color: #4CAF50;
-    color: white;
-    padding: 8px;
-    border: none;
+    background-color: #FAF0CA; /* สีเหลืองครีมสว่าง */
+    color: #111111;
+    padding: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.03);
     cursor: pointer;
-    border-radius: 4px;
-    font-weight: bold;
+    border-radius: 22px; /* โค้งมนเข้าคู่กับ Input */
+    font-weight: 600;
     font-size: 14px;
-    transition: background-color 0.2s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+    text-align: center;
+    margin-top: 8px;
 }
 
 .btn-login:hover {
-    background-color: #45a049;
+    background-color: #EDE5D8;
+    transform: translateY(-1px); /* ลอยขึ้นมินิมอล */
 }
 
+/* ปุ่มรอง: ปุ่มสลับหน้า / ปุ่มโซเชียล Google */
 .btn-signup {
-    padding: 8px;
+    width: 100%;
+    padding: 12px;
     cursor: pointer;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 22px;
+    background-color: #ffffff; /* สีขาวมินิมอล */
+    color: #111111;
     font-size: 14px;
-    transition: background-color 0.2s;
+    font-weight: 500;
+    text-align: center;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
 }
 
 .btn-signup:hover {
-    background-color: #f2f2f2;
+    background-color: #fafafa;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
 }
