@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/

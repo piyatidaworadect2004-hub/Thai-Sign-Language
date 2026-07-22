@@ -1,15 +1,3 @@
-# from sqlmodel import SQLModel, create_engine
-
-# DATABASE_URL = "postgresql://postgres:6610210687@localhost:5432/thai_sign_learning"
-# engine = create_engine(
-#     DATABASE_URL,
-#     echo=True
-# )
-
-# def create_db():
-
-
-#     SQLModel.metadata.create_all(engine)
 
 # app/database.py
 from sqlalchemy import create_engine

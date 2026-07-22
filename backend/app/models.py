@@ -1,9 +1,9 @@
 from typing import Optional
+from datetime import datetime
 from sqlmodel import SQLModel, Field
+from sqlalchemy import func
 
-# ==========================
-# Category
-# ==========================
+
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
@@ -13,16 +13,28 @@ class Category(SQLModel, table=True):
     image: str
 
 
-# ==========================
-# User
-# ==========================
-# 💡 ปรับปรุงคลาส User ใหม่ให้ใช้ SQLModel เพียงตัวเดียว และมีฟิลด์ครบถ้วนตรงกับ Database จริง!
 class User(SQLModel, table=True):
-    __tablename__ = "users" # กำหนดชื่อตารางให้ตรงกับใน PostgreSQL
+    __tablename__ = "users" 
 
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True, nullable=False)
     email: str = Field(index=True, unique=True, nullable=False)
     password_hash: str = Field(nullable=False)
-    full_name: Optional[str] = Field(default=None, nullable=True) # 💡 เพิ่มฟิลด์นี้เข้ามาใน SQLModel
-    role: str = Field(default="user", nullable=False)             # 💡 มีฟิลด์ role ตามฐานข้อมูลจริง
+    full_name: Optional[str] = Field(default=None, nullable=True) 
+    role: str = Field(default="user", nullable=False)
+
+
+class UserProgress(SQLModel, table=True):
+    __tablename__ = "user_progress"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", nullable=False)
+    category_id: int = Field(nullable=False)
+    completion_percentage: int = Field(default=0)
+    correctness_percentage: int = Field(default=0)
+    
+    # ดึงฟังก์ชันเวลาปัจจุบันมาใส่ให้อัตโนมัติเวลาเซฟข้อมูลและอัปเดตคะแนน
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()}
+    )

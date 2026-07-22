@@ -1,31 +1,23 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import Column, Integer, ForeignKey
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, func
 from app.database import engine, Base, get_db
 from app.routers import auth
 from pydantic import BaseModel
+from typing import List
 import random
+from datetime import datetime
 
-# 💡 Import ตัว User จาก SQLModel และ SQLModel เองเข้ามาใช้งานร่วมกับ Base
-from sqlmodel import SQLModel
-from app.models import User, Category
+# Import ตัว User, Category และ UserProgress ที่เป็น SQLModel มาใช้งาน
+from sqlmodel import SQLModel, select
+from app.models import User, Category, UserProgress
 from app.routers.auth import get_current_user
 
-# โครงสร้างตารางสำหรับเก็บ Progress (ผูกกับ Base ดั้งเดิม)
-class UserProgress(Base):
-    __tablename__ = "user_progress"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    category_id = Column(Integer, nullable=False)
-    progress = Column(Integer, default=0)
-
 # ==========================================
-# 🚨 สั่งสร้างตารางคู่กัน ทั้ง SQLModel และ Base ดั้งเดิม
+# สั่งสร้างตารางผ่าน SQLModel
 # ==========================================
-SQLModel.metadata.create_all(bind=engine) # สร้างตาราง users, categories ของ SQLModel
-Base.metadata.create_all(bind=engine)     # สร้างตาราง user_progress ของ SQLAlchemy Base
+SQLModel.metadata.create_all(bind=engine) 
 
 app = FastAPI(title="My Backend Service")
 
@@ -62,17 +54,9 @@ words = [
 def home():
     return {"message": "API is running"}
 
-# ทำงานแบบ Multi-user สมบูรณ์แบบ
+# 🔓 ดึงหมวดหมู่ทั่วไป (ค่าเริ่มต้นเป็น 0)
 @app.get("/categories")
-def get_categories(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user.id
-    
-    db_progress = db.query(UserProgress).filter(UserProgress.user_id == user_id).all()
-    progress_map = {p.category_id: p.progress for p in db_progress}
-
+def get_categories(db: Session = Depends(get_db)):
     personal_categories = []
     for cat in BASE_CATEGORIES:
         personal_categories.append({
@@ -80,22 +64,82 @@ def get_categories(
             "name": cat["name"],
             "total_words": cat["total_words"],
             "difficulty": cat["difficulty"],
-            "progress": progress_map.get(cat["id"], 0), 
+            "completion_percentage": 0, 
+            "correctness_percentage": 0, 
             "image": cat["image"],
             "color": cat["color"]
         })
+    return personal_categories
 
+# 🔐 ดึงหมวดหมู่แบบที่คำนวณเปอร์เซ็นต์ความคืบหน้าของ User คนนั้นๆ จาก DB จริง
+@app.get("/user-categories")
+def get_user_specific_categories(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    user_id = current_user.id
+    personal_categories = []
+    
+    # ดึง Progress ทั้งหมดของ User คนนี้มาทำเป็น Dictionary เพื่อค้นหาง่ายๆ
+    progress_records = db.query(UserProgress).filter(UserProgress.user_id == user_id).all()
+    progress_dict = {p.category_id: p for p in progress_records}
+    
+    for cat in BASE_CATEGORIES:
+        # ถ้าเคยบันทึก Progress ไว้ให้เอามาใช้ ถ้าไม่มีให้เป็น 0
+        record = progress_dict.get(cat["id"])
+        comp_percent = record.completion_percentage if record else 0
+        corr_percent = record.correctness_percentage if record else 0
+        
+        personal_categories.append({
+            "id": cat["id"],
+            "name": cat["name"],
+            "total_words": cat["total_words"],
+            "difficulty": cat["difficulty"],
+            "completion_percentage": comp_percent, 
+            "correctness_percentage": corr_percent, 
+            "image": cat["image"],
+            "color": cat["color"]
+        })
     return personal_categories
 
 @app.get("/categories/{category_id}/words")
 def get_words(category_id: int):
     return [word for word in words if word["category_id"] == category_id]
 
-# API อัปเดตความก้าวหน้าแยกรายบุคคล
+# 📥 API ดูประวัติการเรียน และคำนวณภาพรวมว่า User เรียนไปแล้วกี่เปอร์เซ็นต์ (เฉลี่ยจากทุกหมวดหมู่)
+@app.get("/progress/summary")
+def get_user_progress_summary(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    user_id = current_user.id
+    records = db.query(UserProgress).filter(UserProgress.user_id == user_id).all()
+    
+    if not records:
+        return {
+            "user_id": user_id,
+            "overall_completion": 0.0,
+            "overall_correctness": 0.0,
+            "details": []
+        }
+        
+    total_comp = sum(r.completion_percentage for r in records)
+    total_corr = sum(r.correctness_percentage for r in records)
+    total_categories = len(BASE_CATEGORIES) # หารเฉลี่ยตามจำนวนหมวดหมู่ทั้งหมดที่มีในระบบ
+    
+    return {
+        "user_id": user_id,
+        "overall_completion": round(total_comp / total_categories, 2),
+        "overall_correctness": round(total_corr / total_categories, 2),
+        "details": [
+            {
+                "category_id": r.category_id,
+                "completion_percentage": r.completion_percentage,
+                "correctness_percentage": r.correctness_percentage
+            } for r in records
+        ]
+    }
+
+# 📤 API อัปเดตความก้าวหน้า
 @app.post("/categories/{category_id}/progress")
 def update_progress(
     category_id: int, 
-    new_progress: int, 
+    completion: int, 
+    correctness: int, 
     db: Session = Depends(get_db), 
     current_user: dict = Depends(get_current_user)
 ):
@@ -107,20 +151,35 @@ def update_progress(
     ).first()
 
     if progress_record:
-        progress_record.progress = new_progress
+        progress_record.completion_percentage = completion
+        progress_record.correctness_percentage = correctness
     else:
-        progress_record = UserProgress(user_id=user_id, category_id=category_id, progress=new_progress)
+        progress_record = UserProgress(
+            user_id=user_id, 
+            category_id=category_id, 
+            completion_percentage=completion,
+            correctness_percentage=correctness
+        )
         db.add(progress_record)
 
     db.commit()
-    return {"status": "success", "progress": new_progress}
+    return {
+        "status": "success", 
+        "completion_percentage": completion,
+        "correctness_percentage": correctness
+    }
 
-class PredictRequest(BaseModel):
-    landmarks: list[float]
+# 🤟 ปรับแก้ไขตรงนี้: สร้างแผงรับพิกัดมือให้ตรงกับข้อมูลที่หน้าบ้านส่งมาจริงๆ
+class SignData(BaseModel):
+    lesson_id: str
+    hand_landmarks: List[float]
+    world_landmarks: List[float]
 
 @app.post("/predict")
-def predict(data: PredictRequest):
+def predict(data: SignData):
+
     labels = ["สวัสดี", "ขอบคุณ", "ลาก่อน", "พ่อ", "แม่", "ลูก", "ข้าว", "น้ำ", "อาหาร"]
+    
     return {
         "word": random.choice(labels),
         "confidence": round(random.uniform(0.85, 0.99), 2)

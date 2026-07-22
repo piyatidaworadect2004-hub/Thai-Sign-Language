@@ -38,18 +38,17 @@ export default function Practice() {
 
     async function predictSign(handData, worldHandData) {
         try {
-
-            const response = await fetch("http://localhost:8000/auth/register", {
+            // ✅ เปลี่ยน URL ให้ยิงไปที่ /predict ของฝั่ง AI
+            const response = await fetch("http://localhost:8000/predict", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
+                // ✅ เปลี่ยนมาส่ง ID บทเรียน กับก้อนพิกัดมือ (handData, worldHandData) ที่ได้จาก MediaPipe แทน
                 body: JSON.stringify({
-                    username: username,
-                    email: email,
-                    password: password,
-                    full_name: username,
-                    role: "user"
+                    lesson_id: id,
+                    hand_landmarks: handData,
+                    world_landmarks: worldHandData
                 })
             });
 
@@ -61,13 +60,9 @@ export default function Practice() {
             setConfidence(result.confidence);
 
         } catch (error) {
-
             console.log("Predict API ยังไม่พร้อม");
-
         }
-
     }
-
     useEffect(() => {
 
         let handLandmarker;
@@ -303,7 +298,7 @@ export default function Practice() {
             >
                 ดูตัวอย่างท่าภาษามือจาก TTRS
             </a>
-            
+
 
 
             <div className="relative max-w-3xl mt-8">
