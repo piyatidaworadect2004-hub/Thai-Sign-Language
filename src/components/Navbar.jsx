@@ -4,20 +4,29 @@ import { useNavigate } from 'react-router-dom';
 export default function Navbar() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false); // 👈 สร้าง State เช็กสิทธิ์แอดมิน
 
   useEffect(() => {
-    // 🔍 ดึงชื่อผู้ใช้งานที่เซฟไว้ตอน Login
+    // 🔍 ดึงข้อมูลที่เซฟไว้ตอน Login
     const storedUsername = localStorage.getItem('username');
+    const storedRole = localStorage.getItem('role'); // 👈 ดึงค่า role มาเช็ก
+
     if (storedUsername) {
       setUsername(storedUsername);
+    }
+
+    // 🛡️ ถ้า role เป็น admin ให้เปลี่ยนค่าเป็น true
+    if (storedRole === 'admin') {
+      setIsAdmin(true);
     }
   }, []);
 
   // 🚪 ฟังก์ชันกดออกจากระบบ
   const handleLogout = () => {
-    localStorage.removeItem('token');     // ลบ Token
-    localStorage.removeItem('username');  // ลบชื่อผู้ใช้
-    navigate('/login');                   // เด้งกลับไปหน้า Login
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('role'); // 👈 ลบ role ออกตอน Logout ด้วย
+    navigate('/login');
   };
 
   return (
@@ -33,6 +42,16 @@ export default function Navbar() {
         <a href="#lessons" className="hover:text-blue-600 transition">บทเรียน</a>
         <a href="#predict" className="hover:text-blue-600 transition">ฝึก AI</a>
         <a href="#quiz" className="hover:text-blue-600 transition">แบบทดสอบ</a>
+
+        {/* ⚙️ ปุ่มเมนูแอดมิน (จะแสดงก็ต่อเมื่อ isAdmin เป็น true) */}
+        {isAdmin && (
+          <a 
+            href="/admin-dashboard" 
+            className="text-red-600 font-bold hover:text-red-800 transition bg-red-50 px-3 py-1 rounded-full text-sm border border-red-200"
+          >
+            ⚙️ จัดการระบบ (Admin)
+          </a>
+        )}
 
         {/* เส้นแบ่งโซน */}
         <span className="text-gray-300">|</span>

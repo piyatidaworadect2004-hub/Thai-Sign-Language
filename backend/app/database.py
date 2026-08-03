@@ -1,11 +1,10 @@
-
 # app/database.py
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# เปลี่ยน username, password, localhost, port, dbname ให้ตรงกับเครื่องของคุณนะครับ
-DATABASE_URL = "postgresql://postgres:6610210687@localhost:5432/thai_sign_learning"
+# ใช้พอร์ต 5432 (Session mode / Direct URL) สำหรับการรันและสร้างตาราง (Base.metadata.create_all)
+DATABASE_URL = "postgresql://postgres.urbqulnmzmmtdyagasqe:Piyatida2026@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

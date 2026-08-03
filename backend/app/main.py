@@ -10,16 +10,16 @@ from fastapi import FastAPI, Depends, HTTPException, Header, WebSocket, WebSocke
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from sqlmodel import SQLModel, select
 
-# Import Database, Models และ Auth
+# Import Database, Models และ Routers ทั้งหมด
 from app.database import engine, Base, get_db
-from app.routers import auth
+from app.routers import auth, category, lesson, practice, progress, quiz
 from app.routers.auth import get_current_user
 from app.models import User, Category, UserProgress, PracticeLog
+Base.metadata.create_all(bind=engine)
 
 # ==========================================
-# 🟢 Import MediaPipe แบบปลอดภัยสูงสุด (รองรับ Python 3.12+)
+# 🟢 Import MediaPipe แบบปลอดภัยสูงสุด
 # ==========================================
 import mediapipe as mp
 
@@ -32,23 +32,31 @@ else:
     except (ModuleNotFoundError, AttributeError):
         mp_hands = None
 
-# สร้างตารางใน PostgreSQL
-SQLModel.metadata.create_all(bind=engine) 
+app = FastAPI(title="Thai Sign Learning API")
 
-app = FastAPI(title="Thai Sign Language Evaluation API")
+# 🟢 ตั้งค่า CORS อนุญาตให้ Frontend เรียกใช้ API ได้
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
-# เปิดสิทธิ์ CORS ครอบคลุมทุกโดเมน
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
+# 🟢 ลงทะเบียน Routers ครบทุกตัว
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+app.include_router(category.router, prefix="/categories", tags=["Categories"])
+app.include_router(lesson.router, prefix="/lessons", tags=["Lessons"])
+app.include_router(practice.router, prefix="/practice", tags=["Practice"])
+app.include_router(progress.router, prefix="/progress", tags=["Progress"])
+app.include_router(quiz.router, prefix="/quizzes", tags=["Quizzes"])
 
-# Instance MediaPipe
+# Instance MediaPipe Hands Detector
 hands_detector = None
 if mp_hands and hasattr(mp_hands, "Hands"):
     hands_detector = mp_hands.Hands(
@@ -59,9 +67,9 @@ if mp_hands and hasattr(mp_hands, "Hands"):
     )
 
 BASE_CATEGORIES = [
-    {"id": 1, "name": "คำทักทาย", "total_words": 20, "difficulty": "ง่าย", "image": "👋", "color": "bg-blue-400"},
-    {"id": 2, "name": "ครอบครัว", "total_words": 15, "difficulty": "ปานกลาง", "image": "👨‍👩‍👧", "color": "bg-green-400"},
-    {"id": 3, "name": "อาหาร", "total_words": 25, "difficulty": "ง่าย", "image": "🍜", "color": "bg-orange-400"}
+    {"id": 1, "name": "คำทักทาย", "total_words": 5, "difficulty": "ง่าย", "image": "👋", "color": "bg-blue-400"},
+    {"id": 2, "name": "ครอบครัว", "total_words": 5, "difficulty": "ปานกลาง", "image": "👨‍👩‍👧", "color": "bg-green-400"},
+    {"id": 3, "name": "อาหาร", "total_words": 5, "difficulty": "ง่าย", "image": "🍜", "color": "bg-orange-400"}
 ]
 
 words = [
@@ -76,8 +84,6 @@ words = [
     {"id": 9, "category_id": 3, "word": "อาหาร", "meaning": "Food", "image": "🍜"}
 ]
 
-
-# ฟังก์ชันดึง User แบบยืดหยุ่น (ไม่บังคับว่าต้องส่ง Token มาเสมอ)
 def get_optional_current_user(
     authorization: Optional[str] = Header(None), 
     db: Session = Depends(get_db)
@@ -90,14 +96,46 @@ def get_optional_current_user(
     except Exception:
         return None
 
-
 @app.get("/")
-def home():
-    return {"message": "Thai Sign Language Evaluation API is running"}
-
+def root():
+    return {"message": "Thai Sign Learning API is running"}
 
 # ==========================================
-# 🎯 Schema รับค่าจาก Frontend
+# 🎯 Schema & Endpoints สำหรับจัดการสิทธิ์ (Role Update)
+# ==========================================
+class RoleUpdate(BaseModel):
+    role: str
+
+@app.put("/auth/users/{user_id}/role")
+def update_user_role(
+    user_id: int, 
+    body: RoleUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # ตรวจสอบสิทธิ์ว่าผู้เรียกใช้งานเป็น Admin หรือไม่
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="คุณไม่มีสิทธิ์ใช้งานฟังก์ชันนี้")
+
+    # ค้นหา User ในระบบ
+    user_to_update = db.query(User).filter(User.id == user_id).first()
+    if not user_to_update:
+        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้งานนี้ในระบบ")
+
+    # อัปเดตสิทธิ์ใหม่
+    user_to_update.role = body.role
+    db.commit()
+    db.refresh(user_to_update)
+
+    return {
+        "status": "success",
+        "message": f"อัปเดตสิทธิ์ของ User ID {user_id} เป็น {body.role} เรียบร้อยแล้ว",
+        "user_id": user_to_update.id,
+        "new_role": user_to_update.role
+    }
+
+# ==========================================
+# 🎯 Schema & Endpoints สำหรับกล้อง / Predict / WebSocket
 # ==========================================
 class SignData(BaseModel):
     lesson_id: Optional[str] = "1"
@@ -105,30 +143,21 @@ class SignData(BaseModel):
     hand_landmarks: List[float]
     world_landmarks: Optional[List[float]] = []
 
-
-# ==========================================
-# 🚀 HTTP POST: ประเมินภาษามือ + บันทึกลง PostgreSQL
-# ==========================================
 @app.post("/predict")
 def predict(
     data: SignData, 
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user)
 ):
-    # 1. Check พิกัดมือจาก MediaPipe
     if not data.hand_landmarks or len(data.hand_landmarks) < 63:
         raise HTTPException(status_code=400, detail="ข้อมูลพิกัดมือไม่สมบูรณ์")
 
-    # 2. กำหนดคำโจทย์ที่ยิงมาจาก Frontend
     target_word = data.target_word if (data.target_word and data.target_word.strip() != "") else "สวัสดี"
-    
-    # 3. ล็อกคำทำนายให้ตรงกับโจทย์ ไม่ใช้การ random.choice() คำอื่น เพื่อแก้ปัญหาคำเพี้ยน
     predicted_word = target_word
     confidence = round(random.uniform(0.85, 0.98), 2)
     correctness_percentage = round(confidence * 100, 2)
     is_correct = True
 
-    # 4. บันทึก Log ลง PostgreSQL ทันที (ถ้ามี User ล็อกอิน)
     log_id = None
     if current_user:
         try:
@@ -150,24 +179,19 @@ def predict(
             db.rollback()
             print(f"⚠️ บันทึกลง Postgres ไม่สำเร็จ: {e}")
 
-    # 5. คืนค่า Response ครอบคลุมทุกชื่อ Key ที่ React อาจเรียกใช้
     return {
         "status": "success",
         "log_id": log_id,
-        "word": predicted_word,             # รองรับ res.data.word
-        "predicted_word": predicted_word,   # รองรับ res.data.predicted_word
-        "result": predicted_word,          # รองรับ res.data.result
-        "detected": predicted_word,        # รองรับ res.data.detected
+        "word": predicted_word,
+        "predicted_word": predicted_word,
+        "result": predicted_word,
+        "detected": predicted_word,
         "target_word": target_word,
         "confidence": confidence,
         "correctness_percentage": correctness_percentage,
         "is_correct": is_correct
     }
 
-
-# ==========================================
-# 📊 ดึงประวัติการซ้อมย้อนหลัง
-# ==========================================
 @app.get("/practice-history")
 def get_practice_history(
     db: Session = Depends(get_db), 
@@ -180,10 +204,6 @@ def get_practice_history(
              .all()
     return logs
 
-
-# ==========================================
-# 🔌 WebSocket Endpoint
-# ==========================================
 @app.websocket("/ws/stream")
 async def websocket_stream(websocket: WebSocket):
     await websocket.accept()
@@ -216,7 +236,6 @@ async def websocket_stream(websocket: WebSocket):
                             for lm in hand_landmarks.landmark:
                                 landmarks_list.append({"x": lm.x, "y": lm.y, "z": lm.z})
 
-                            # กำหนดคำทำนายให้ตรงตามโจทย์ที่ยิงมาทาง WebSocket
                             detected_word = target_word if target_word else "สวัสดี"
                             accuracy = random.randint(88, 98)
 
@@ -236,122 +255,3 @@ async def websocket_stream(websocket: WebSocket):
         print("❌ Client disconnected from WebSocket")
     except Exception as e:
         print(f"⚠️ Error in WebSocket: {e}")
-
-
-# ==========================================
-# 📚 Categories & Progress APIs
-# ==========================================
-@app.get("/categories")
-def get_categories(db: Session = Depends(get_db)):
-    personal_categories = []
-    for cat in BASE_CATEGORIES:
-        personal_categories.append({
-            "id": cat["id"],
-            "name": cat["name"],
-            "total_words": cat["total_words"],
-            "difficulty": cat["difficulty"],
-            "completion_percentage": 0, 
-            "correctness_percentage": 0, 
-            "image": cat["image"],
-            "color": cat["color"]
-        })
-    return personal_categories
-
-@app.get("/user-categories")
-def get_user_specific_categories(
-    db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
-):
-    user_id = current_user.id
-    personal_categories = []
-    
-    progress_records = db.query(UserProgress).filter(UserProgress.user_id == user_id).all()
-    progress_dict = {p.category_id: p for p in progress_records}
-    
-    for cat in BASE_CATEGORIES:
-        record = progress_dict.get(cat["id"])
-        comp_percent = record.completion_percentage if record else 0
-        corr_percent = record.correctness_percentage if record else 0
-        
-        personal_categories.append({
-            "id": cat["id"],
-            "name": cat["name"],
-            "total_words": cat["total_words"],
-            "difficulty": cat["difficulty"],
-            "completion_percentage": comp_percent, 
-            "correctness_percentage": corr_percent, 
-            "image": cat["image"],
-            "color": cat["color"]
-        })
-    return personal_categories
-
-@app.get("/categories/{category_id}/words")
-def get_words(category_id: int):
-    return [word for word in words if word["category_id"] == category_id]
-
-@app.get("/progress/summary")
-def get_user_progress_summary(
-    db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
-):
-    user_id = current_user.id
-    records = db.query(UserProgress).filter(UserProgress.user_id == user_id).all()
-    
-    if not records:
-        return {
-            "user_id": user_id,
-            "overall_completion": 0.0,
-            "overall_correctness": 0.0,
-            "details": []
-        }
-        
-    total_comp = sum(r.completion_percentage for r in records)
-    total_corr = sum(r.correctness_percentage for r in records)
-    total_categories = len(BASE_CATEGORIES)
-    
-    return {
-        "user_id": user_id,
-        "overall_completion": round(total_comp / total_categories, 2),
-        "overall_correctness": round(total_corr / total_categories, 2),
-        "details": [
-            {
-                "category_id": r.category_id,
-                "completion_percentage": r.completion_percentage,
-                "correctness_percentage": r.correctness_percentage
-            } for r in records
-        ]
-    }
-
-@app.post("/categories/{category_id}/progress")
-def update_progress(
-    category_id: int, 
-    completion: int, 
-    correctness: int, 
-    db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
-):
-    user_id = current_user.id
-
-    progress_record = db.query(UserProgress).filter(
-        UserProgress.user_id == user_id, 
-        UserProgress.category_id == category_id
-    ).first()
-
-    if progress_record:
-        progress_record.completion_percentage = completion
-        progress_record.correctness_percentage = correctness
-    else:
-        progress_record = UserProgress(
-            user_id=user_id, 
-            category_id=category_id, 
-            completion_percentage=completion,
-            correctness_percentage=correctness
-        )
-        db.add(progress_record)
-
-    db.commit()
-    return {
-        "status": "success", 
-        "completion_percentage": completion,
-        "correctness_percentage": correctness
-    }

@@ -1,34 +1,97 @@
-# backend/app/schemas.py
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
+from typing import Optional, List
+from datetime import datetime
 
-# 💡 คลาสสำหรับรองรับการส่งข้อมูล Login แบบ JSON จากหน้าบ้าน React
+# --- Auth Schemas ---
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    username: str
+    role: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
 class UserLoginRequest(BaseModel):
     username: str
     password: str
 
-# โครงสร้างพื้นฐานของ User
+# --- User Schemas ---
 class UserBase(BaseModel):
     username: str
-    email: EmailStr
+    email: str
     full_name: Optional[str] = None
-    role: Optional[str] = "user"
 
-# รูปแบบข้อมูลเมื่อสมัครสมาชิก (ต้องรับ password)
 class UserCreate(UserBase):
     password: str
 
-# รูปแบบข้อมูลเมื่อส่งออกไป (ไม่ส่ง password กลับไป)
 class UserOut(UserBase):
     id: int
+    role: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-# รูปแบบการตอบกลับเมื่อ Login สำเร็จ (ได้ JWT Token)
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+# 🟢 --- Category Schemas (เพิ่ม Field รองรับการ Insert และ UI) ---
+class CategoryBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    total_words: Optional[int] = 0
+    difficulty: Optional[str] = "ง่าย"
+    color: Optional[str] = "bg-blue-500"
+    image: Optional[str] = ""
 
-class TokenData(BaseModel):
-    username: Optional[str] = None
+class CategoryOut(CategoryBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+# --- Lesson Schemas ---
+class LessonBase(BaseModel):
+    category_id: int
+    title: str
+    description: Optional[str] = None
+    video_url: Optional[str] = None
+
+class LessonCreate(LessonBase):
+    pass
+
+class LessonOut(LessonBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+# --- Quiz Schemas ---
+class QuizBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+
+class QuizOut(QuizBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+# --- PracticeLog Schemas ---
+class PracticeLogCreate(BaseModel):
+    word_id: int
+    word_name: str
+    correctness_percentage: int
+
+class PracticeLogOut(PracticeLogCreate):
+    id: int
+    user_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+# --- UserProgress Schemas ---
+class UserProgressBase(BaseModel):
+    category_id: int
+    completion_percentage: int = 0
+    correctness_percentage: int = 0
+
+class UserProgressOut(UserProgressBase):
+    id: int
+    user_id: int
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

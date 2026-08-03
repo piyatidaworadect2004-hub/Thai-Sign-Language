@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Lesson from "./pages/Lesson";
 import Practice from "./pages/Practice";
 import Register from "./pages/Register";
+import AdminDashboard from './pages/Admim/AdminDashboard';
 
 // 1. สร้างตัวกรองตรวจตั๋ว (Protected Route)
 // ทำหน้าที่เช็กว่ามี Token อยู่ในเครื่องไหม ถ้าไม่มีจะเตะกลับไปหน้า Login ทันที
@@ -72,6 +73,16 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Practice />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 🟢 หน้าจัดการระบบสำหรับแอดมิน */}
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
             </ProtectedRoute>
           }
         />
