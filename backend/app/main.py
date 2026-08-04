@@ -113,16 +113,13 @@ def update_user_role(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # ตรวจสอบสิทธิ์ว่าผู้เรียกใช้งานเป็น Admin หรือไม่
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="คุณไม่มีสิทธิ์ใช้งานฟังก์ชันนี้")
 
-    # ค้นหา User ในระบบ
     user_to_update = db.query(User).filter(User.id == user_id).first()
     if not user_to_update:
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้งานนี้ในระบบ")
 
-    # อัปเดตสิทธิ์ใหม่
     user_to_update.role = body.role
     db.commit()
     db.refresh(user_to_update)
@@ -152,7 +149,7 @@ def predict(
     if not data.hand_landmarks or len(data.hand_landmarks) < 63:
         raise HTTPException(status_code=400, detail="ข้อมูลพิกัดมือไม่สมบูรณ์")
 
-    target_word = data.target_word if (data.target_word and data.target_word.strip() != "") else "สวัสดี"
+    target_word = data.target_word if (data.target_word and data.target_word.strip() != "") else "random_word"
     predicted_word = target_word
     confidence = round(random.uniform(0.85, 0.98), 2)
     correctness_percentage = round(confidence * 100, 2)
@@ -192,7 +189,9 @@ def predict(
         "is_correct": is_correct
     }
 
+# 🟢 รองรับทั้ง /practice-history และ /progress เพื่อป้องกันปัญหาเรียกผิด Route
 @app.get("/practice-history")
+@app.get("/progress")
 def get_practice_history(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
@@ -202,7 +201,20 @@ def get_practice_history(
              .order_by(PracticeLog.created_at.desc())\
              .limit(50)\
              .all()
-    return logs
+             
+    # แปลงโครงสร้างข้อมูลให้หน้า Dashboard อ่านค่า `lesson` และ `confidence` ได้อย่างถูกต้อง
+    formatted_logs = []
+    for log in logs:
+        formatted_logs.append({
+            "id": log.id,
+            "lesson_id": log.lesson_id,
+            "confidence": log.confidence or (log.correctness_percentage / 100 if log.correctness_percentage else 0.9),
+            "created_at": log.created_at.isoformat() if log.created_at else datetime.utcnow().isoformat(),
+            "lesson": {
+                "word": log.target_word or f"บทเรียนที่ {log.lesson_id}"
+            }
+        })
+    return formatted_logs
 
 @app.websocket("/ws/stream")
 async def websocket_stream(websocket: WebSocket):
