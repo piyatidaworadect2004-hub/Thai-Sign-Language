@@ -1,59 +1,82 @@
-from typing import Optional
-from datetime import datetime
-from sqlmodel import SQLModel, Field
-from sqlalchemy import func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Float, Boolean
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.database import Base
 
+class User(Base):
+    __tablename__ = "users"
 
-class Category(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    description: str
-    difficulty: str
-    total_words: int
-    image: str
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    
+    password_hash = Column(String, nullable=False)
+    
+    full_name = Column(String, nullable=True)
+    role = Column(String, default="user")
 
+    progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
+    practice_logs = relationship("PracticeLog", back_populates="user", cascade="all, delete-orphan")
 
-class User(SQLModel, table=True):
-    __tablename__ = "users" 
+class Category(Base):
+    __tablename__ = "category"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    username: str = Field(index=True, unique=True, nullable=False)
-    email: str = Field(index=True, unique=True, nullable=False)
-    password_hash: str = Field(nullable=False)
-    full_name: Optional[str] = Field(default=None, nullable=True) 
-    role: str = Field(default="user", nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    
+    difficulty = Column(String, nullable=True)
+    color = Column(String, nullable=True)
+    image = Column(String, nullable=True)
+    total_words = Column(Integer, default=0)
 
+    lessons = relationship("Lesson", back_populates="category", cascade="all, delete-orphan")
+    progress = relationship("UserProgress", back_populates="category")
 
-class UserProgress(SQLModel, table=True):
+class Lesson(Base):
+    __tablename__ = "lessons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("category.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    video_url = Column(String, nullable=True)
+
+    category = relationship("Category", back_populates="lessons")
+
+class Quiz(Base):
+    __tablename__ = "quizzes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+
+class UserProgress(Base):
     __tablename__ = "user_progress"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", nullable=False)
-    category_id: int = Field(nullable=False)
-    completion_percentage: int = Field(default=0)
-    correctness_percentage: int = Field(default=0)
-    
-    # ดึงฟังก์ชันเวลาปัจจุบันมาใส่ให้อัตโนมัติเวลาเซฟข้อมูลและอัปเดตคะแนน
-    updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column_kwargs={"server_default": func.now(), "onupdate": func.now()}
-    )
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(Integer, ForeignKey("category.id"), nullable=False)
+    completion_percentage = Column(Integer, default=0)
+    correctness_percentage = Column(Integer, default=0)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
+    __table_args__ = (UniqueConstraint('user_id', 'category_id', name='unique_user_category'),)
 
-# 🟢 เพิ่มตารางบันทึก Log การซ้อมทำท่าภาษามือลง PostgreSQL
-class PracticeLog(SQLModel, table=True):
+    user = relationship("User", back_populates="progress")
+    category = relationship("Category", back_populates="progress")
+
+class PracticeLog(Base):
     __tablename__ = "practice_logs"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", nullable=False)
-    lesson_id: str = Field(nullable=False)
-    target_word: str = Field(nullable=False)             # โจทย์ เช่น "สวัสดี"
-    predicted_word: str = Field(nullable=False)          # คำที่ AI/ระบบทำนายได้
-    correctness_percentage: float = Field(default=0.0)   # % ความถูกต้องของท่าทาง
-    confidence: float = Field(default=0.0)              # ค่าความมั่นใจของโมเดล
-    is_correct: bool = Field(default=False)             # ทำถูกต้องตามโจทย์ไหม
-    
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column_kwargs={"server_default": func.now()}
-    )
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    lesson_id = Column(String, nullable=True)
+    target_word = Column(String(100), nullable=False)
+    predicted_word = Column(String(100), nullable=True)
+    correctness_percentage = Column(Float, nullable=False)
+    confidence = Column(Float, nullable=True)
+    is_correct = Column(Boolean, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", back_populates="practice_logs")

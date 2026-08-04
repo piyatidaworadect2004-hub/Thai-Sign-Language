@@ -7,29 +7,39 @@ import RecommendationCard from "../components/RecommendationCard";
 
 export default function Home() {
   const [categories, setCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    // 🚀 1. ดึง Token ออกมาจากเครื่องคอมพิวเตอร์ของ User ปัจจุบัน
     const token = localStorage.getItem("token");
 
-    // 🚀 2. ทำการยื่นคำขอไปยัง Backend พร้อมแนบ Token ไปใน Headers
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     fetch("http://127.0.0.1:8000/categories", {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        // ส่ง Header สำคัญชื่อ Authorization พร้อมค่า Bearer + token ของเรา
-        "Authorization": `Bearer ${token}`
-      }
+      headers: headers,
     })
       .then((res) => {
         if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
+          throw new Error(`ดึงข้อมูลไม่สำเร็จ (Status: ${res.status})`);
         }
         return res.json();
       })
-      .then((data) => setCategories(data))
+      .then((data) => {
+        setCategories(data);
+      })
       .catch((err) => {
         console.error("ดึงข้อมูลล้มเหลว:", err);
+        setErrorMsg(err.message);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, []);
 
@@ -41,13 +51,14 @@ export default function Home() {
 
       {/* หมวดหมู่บทเรียน */}
       <section className="max-w-7xl mx-auto py-16 px-8">
-        <h2 className="text-4xl font-bold mb-8">
-          หมวดหมู่บทเรียน
-        </h2>
+        <h2 className="text-4xl font-bold mb-8">หมวดหมู่บทเรียน</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-
-          {categories.length > 0 ? (
+          {isLoading ? (
+            <p className="text-gray-500 font-medium animate-pulse">กำลังโหลดข้อมูล...</p>
+          ) : errorMsg ? (
+            <p className="text-red-500 font-medium">เกิดข้อผิดพลาด: {errorMsg}</p>
+          ) : categories.length > 0 ? (
             categories.map((category) => (
               <CategoryCard
                 key={category.id}
@@ -61,39 +72,31 @@ export default function Home() {
               />
             ))
           ) : (
-            <p>กำลังโหลดข้อมูล...</p>
+            <p className="text-gray-500">ไม่พบข้อมูลหมวดหมู่บทเรียน</p>
           )}
-
         </div>
       </section>
 
-
-      {/* คำแนะนำ */}
+      {/* คำแนะนำสำหรับคุณ */}
       <section className="max-w-7xl mx-auto py-16 px-8">
-        <h2 className="text-4xl font-bold mb-8">
-          คำแนะนำสำหรับคุณ
-        </h2>
+        <h2 className="text-4xl font-bold mb-8">คำแนะนำสำหรับคุณ</h2>
 
         <div className="grid lg:grid-cols-3 gap-8">
-
-          <RecommendationCard
-            title="ทักทาย"
-            level="ง่าย"
-          />
-
-          <RecommendationCard
-            title="ครอบครัว"
-            level="ปานกลาง"
-          />
-
-          <RecommendationCard
-            title="อาหาร"
-            level="ง่าย"
-          />
-
+          {isLoading ? (
+            <p className="text-gray-500 font-medium animate-pulse">กำลังโหลดคำแนะนำ...</p>
+          ) : categories.length > 0 ? (
+            categories.slice(0, 3).map((category) => (
+              <RecommendationCard 
+                key={category.id}
+                title={category.name} 
+                level={category.difficulty} 
+              />
+            ))
+          ) : (
+            <p className="text-gray-500">ไม่พบข้อมูลคำแนะนำ</p>
+          )}
         </div>
       </section>
-
     </div>
   );
 }

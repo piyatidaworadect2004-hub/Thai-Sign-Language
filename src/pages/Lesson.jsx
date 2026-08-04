@@ -31,9 +31,15 @@ export default function Lesson() {
   // ==========================================
   async function predictSign(allHandData, allWorldHandData) {
     try {
+      // 🟢 ดึง JWT Token มาใช้ยืนยันตัวตน
+      const token = localStorage.getItem("token");
+
       const response = await fetch("http://localhost:8000/predict", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
         body: JSON.stringify({
           lesson_id: id,
           hand_landmarks: allHandData,
@@ -81,7 +87,7 @@ export default function Lesson() {
             delegate: "GPU",
           },
           runningMode: "VIDEO",
-          numHands: 2, // 👈 1. ปรับเพิ่มเป็น 2 มือตรงนี้!
+          numHands: 2,
         });
 
         if (isMounted.current) setCameraOn(true);
@@ -118,7 +124,6 @@ export default function Lesson() {
               const allHandData = [];
               const allWorldHandData = [];
 
-              // 👈 2. Loop วาดตามจำนวนมือที่เจอ (1 หรือ 2 มือ)
               results.landmarks.forEach((landmarks, index) => {
                 const worldLandmarks = results.worldLandmarks?.[index] || [];
 
@@ -179,6 +184,10 @@ export default function Lesson() {
       if (animationId) cancelAnimationFrame(animationId);
       if (videoRef.current?.srcObject) {
         videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      }
+      // 🟢 คืนค่า Resource เมื่อออกจากหน้า
+      if (handLandmarker) {
+        handLandmarker.close();
       }
     };
   }, []);
