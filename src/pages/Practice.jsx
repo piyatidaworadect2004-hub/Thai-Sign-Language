@@ -30,14 +30,16 @@ export default function Practice() {
     const isMounted = useRef(true); 
 
     // ==========================
-    // ส่งข้อมูลไป AI
+    // ส่งข้อมูลไป AI พร้อมแนบ Token ยืนยันตัวตน
     // ==========================
     async function predictSign(handData, worldHandData) {
         try {
+            const token = localStorage.getItem("token"); // ดึง Token ของผู้ใช้ที่ล็อกอินอยู่
             const response = await fetch("http://localhost:8000/predict", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    ...(token && { Authorization: `Bearer ${token}` }) // แนบ Token ไปด้วย
                 },
                 body: JSON.stringify({
                     lesson_id: id,
@@ -250,11 +252,11 @@ export default function Practice() {
             </div>
 
             {cameraOn && (
-                <p className="mt-5 text-green-600 font-bold">🟢 กล้องทำงาน</p>
+                <p className="mt-5 text-green-600 font-bold"> กล้องทำงาน</p>
             )}
 
             {handDetected && (
-                <p className="mt-2 text-blue-600 font-bold">🤟 ตรวจพบมือ</p>
+                <p className="mt-2 text-blue-600 font-bold">ตรวจพบมือ</p>
             )}
 
             {debug && (

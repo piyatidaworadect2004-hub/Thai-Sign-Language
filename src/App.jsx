@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Lesson from "./pages/Lesson";
+import Dashboard from "./pages/Dashboard";
+import LessonList from "./pages/LessonList";
 import Practice from "./pages/Practice";
 import Register from "./pages/Register";
 import AdminDashboard from './pages/Admim/AdminDashboard';
@@ -11,7 +13,7 @@ import AdminDashboard from './pages/Admim/AdminDashboard';
 // ทำหน้าที่เช็กว่ามี Token อยู่ในเครื่องไหม ถ้าไม่มีจะเตะกลับไปหน้า Login ทันที
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token"); // ดึง token ที่เก็บไว้ตอน login สำเร็จ
-  
+
   if (!token) {
     // ไม่มี Token = ยังไม่ได้ล็อกอิน -> ส่งกลับไปหน้า Login
     return <Navigate to="/login" replace />;
@@ -46,7 +48,7 @@ export default function App() {
         {/* ============================================================== */}
         {/* กลุ่มหน้าเว็บที่ต้อง Login ก่อนเท่านั้นถึงจะเข้าได้ (ใช้ ProtectedRoute คลุมไว้) */}
         {/* ============================================================== */}
-        
+
         {/* หน้า Home */}
         <Route
           path="/home"
@@ -91,6 +93,26 @@ export default function App() {
         <Route
           path="*"
           element={<Navigate to="/login" replace />}
+        />
+
+        {/* หน้าแดชบอร์ดสรุปผล */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* หน้าแสดงรายการบทเรียน */}
+        <Route
+          path="/lessons"
+          element={
+            <ProtectedRoute>
+              <LessonList />
+            </ProtectedRoute>
+          }
         />
 
       </Routes>

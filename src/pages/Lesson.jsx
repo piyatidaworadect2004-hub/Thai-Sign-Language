@@ -1,245 +1,98 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
-
-const HAND_CONNECTIONS = [
-  [0, 1], [1, 2], [2, 3], [3, 4],
-  [0, 5], [5, 6], [6, 7], [7, 8],
-  [5, 9], [9, 10], [10, 11], [11, 12],
-  [9, 13], [13, 14], [14, 15], [15, 16],
-  [13, 17], [17, 18], [18, 19], [19, 20],
-  [0, 17]
-];
 
 export default function Lesson() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [lessonData, setLessonData] = useState(null);
 
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-
-  const [cameraOn, setCameraOn] = useState(false);
-  const [handCount, setHandCount] = useState(0); // นับจำนวนมือที่เจอ (0, 1, 2)
-  const [prediction, setPrediction] = useState("");
-  const [confidence, setConfidence] = useState(0);
-
-  const lastPredictTime = useRef(0);
-  const isMounted = useRef(true);
-
-  // ==========================================
-  // 🎯 ส่งข้อมูล Landmarks (ทั้งสองมือ) ไปที่ AI
-  // ==========================================
-  async function predictSign(allHandData, allWorldHandData) {
-    try {
-      // 🟢 ดึง JWT Token มาใช้ยืนยันตัวตน
-      const token = localStorage.getItem("token");
-
-      const response = await fetch("http://localhost:8000/predict", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          lesson_id: id,
-          hand_landmarks: allHandData,
-          world_landmarks: allWorldHandData,
-        }),
-      });
-
-      if (!response.ok) return;
-
-      const result = await response.json();
-      if (isMounted.current) {
-        setPrediction(result.word);
-        setConfidence(result.confidence);
-      }
-    } catch (error) {
-      console.log("Predict API ไม่พร้อมตอบรับ");
-    }
-  }
-
+  // ดึงข้อมูลรายละเอียดบทเรียนจาก Backend ตาม ID (ถ้ามี API สามารถเปิดใช้งานส่วนนี้ได้ครับ)
   useEffect(() => {
-    isMounted.current = true;
-    let handLandmarker;
-    let animationId;
-    let currentHandCount = 0;
-
-    async function setupMediaPipe() {
+    async function fetchLessonDetail() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-        );
-
-        handLandmarker = await HandLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-            delegate: "GPU",
-          },
-          runningMode: "VIDEO",
-          numHands: 2,
-        });
-
-        if (isMounted.current) setCameraOn(true);
-
-        function detectHands() {
-          if (
-            videoRef.current &&
-            videoRef.current.readyState === 4 &&
-            canvasRef.current
-          ) {
-            const results = handLandmarker.detectForVideo(
-              videoRef.current,
-              Date.now()
-            );
-
-            const canvas = canvasRef.current;
-            const ctx = canvas.getContext("2d");
-
-            if (videoRef.current.videoWidth > 0) {
-              canvas.width = videoRef.current.videoWidth;
-              canvas.height = videoRef.current.videoHeight;
-            }
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const detectedNum = results.landmarks ? results.landmarks.length : 0;
-
-            if (detectedNum !== currentHandCount) {
-              currentHandCount = detectedNum;
-              if (isMounted.current) setHandCount(detectedNum);
-            }
-
-            if (detectedNum > 0) {
-              const allHandData = [];
-              const allWorldHandData = [];
-
-              results.landmarks.forEach((landmarks, index) => {
-                const worldLandmarks = results.worldLandmarks?.[index] || [];
-
-                landmarks.forEach((p) => allHandData.push(p.x, p.y, p.z));
-                worldLandmarks.forEach((p) => allWorldHandData.push(p.x, p.y, p.z));
-
-                // 🟢 วาดเส้น Skeleton (ใช้สีเขียวสด)
-                HAND_CONNECTIONS.forEach(([start, end]) => {
-                  const p1 = landmarks[start];
-                  const p2 = landmarks[end];
-                  ctx.beginPath();
-                  ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
-                  ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
-                  ctx.strokeStyle = "#00FF00";
-                  ctx.lineWidth = 4;
-                  ctx.stroke();
-                });
-
-                // 🔴 วาดจุด Joint 21 จุด
-                landmarks.forEach((p) => {
-                  ctx.beginPath();
-                  ctx.arc(p.x * canvas.width, p.y * canvas.height, 6, 0, 2 * Math.PI);
-                  ctx.fillStyle = "#FF007F";
-                  ctx.fill();
-                  ctx.strokeStyle = "#FFFFFF";
-                  ctx.lineWidth = 1.5;
-                  ctx.stroke();
-                });
-              });
-
-              // Throttle ยิง API ทุกๆ 500ms
-              const now = Date.now();
-              if (now - lastPredictTime.current > 500) {
-                lastPredictTime.current = now;
-                predictSign(allHandData, allWorldHandData);
-              }
-
-            } else {
-              if (isMounted.current && (prediction !== "" || confidence !== 0)) {
-                setPrediction("");
-                setConfidence(0);
-              }
-            }
+        const token = localStorage.getItem("token");
+        const response = await fetch(`http://localhost:8000/lessons/${id}`, {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` })
           }
-          animationId = requestAnimationFrame(detectHands);
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setLessonData(data);
         }
-
-        detectHands();
-      } catch (err) {
-        console.error("MediaPipe/Camera Error:", err);
+      } catch (error) {
+        console.log("ไม่สามารถดึงข้อมูลบทเรียนได้ ใช้ค่าเริ่มต้นแทน");
       }
     }
-
-    setupMediaPipe();
-
-    return () => {
-      isMounted.current = false;
-      if (animationId) cancelAnimationFrame(animationId);
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-      }
-      // 🟢 คืนค่า Resource เมื่อออกจากหน้า
-      if (handLandmarker) {
-        handLandmarker.close();
-      }
-    };
-  }, []);
+    fetchLessonDetail();
+  }, [id]);
 
   return (
-    <div className="min-h-screen bg-slate-100 p-8">
-      <button
-        onClick={() => navigate(-1)}
-        className="bg-gray-600 text-white px-5 py-2 rounded-xl mb-6 hover:bg-gray-700 transition"
-      >
-        ← กลับ
-      </button>
-
-      <h1 className="text-3xl font-bold">บทเรียนภาษามือ</h1>
-      <p className="text-gray-600 mt-1">Lesson ID: {id}</p>
-
-      {/* กล้อง Video + Canvas Skeleton */}
-      <div className="relative max-w-2xl mt-6 rounded-2xl overflow-hidden shadow-2xl bg-black">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-full h-full object-cover"
-          style={{ transform: "scaleX(-1)" }}
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
-          style={{ transform: "scaleX(-1)" }}
-        />
+    <div className="min-h-screen bg-sky-100 p-8 flex flex-col items-center">
+      {/* ปุ่มย้อนกลับ */}
+      <div className="w-full max-w-3xl">
+        <button
+          onClick={() => navigate("/home")}
+          className="bg-gray-500 text-white px-5 py-2 rounded-xl mb-6 hover:bg-gray-600 transition shadow"
+        >
+          ← กลับหน้าหลัก
+        </button>
       </div>
 
-      {/* สถานะการตรวจจับ */}
-      <div className="mt-4 flex gap-3">
-        <span className={`px-4 py-1.5 rounded-full font-bold text-sm ${cameraOn ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-          {cameraOn ? "🟢 กล้องทำงาน" : "🔴 ปิดกล้อง"}
-        </span>
-        <span className={`px-4 py-1.5 rounded-full font-bold text-sm ${handCount > 0 ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
-          {handCount === 2 ? "🤟🤟 ตรวจพบ 2 มือ" : handCount === 1 ? "🤟 ตรวจพบ 1 มือ" : "🔍 ไม่พบมือ"}
-        </span>
-      </div>
+      {/* กล่องแสดงรายละเอียดบทเรียน */}
+      <div className="bg-white rounded-3xl shadow-xl p-8 max-w-3xl w-full">
+        <h1 className="text-3xl font-bold text-slate-800">
+          {lessonData?.title || `บทเรียนภาษามือ (ID: ${id})`}
+        </h1>
+        <p className="text-gray-500 mt-1">
+          {lessonData?.description || "ศึกษาท่าทางและคำแนะนำด้านล่างนี้ให้เข้าใจก่อนเริ่มฝึกปฏิบัติจริงกับ AI"}
+        </p>
 
-      {/* ผลการประเมิน */}
-      {prediction && (
-        <div className="mt-6 max-w-md bg-white p-6 rounded-2xl shadow-md border-l-4 border-blue-500">
-          <h2 className="text-gray-500 text-sm font-semibold">ผลการประเมินท่าทาง</h2>
-          <p className="text-4xl font-extrabold text-blue-600 mt-1">{prediction}</p>
-          <p className="text-gray-600 mt-2">
-            ความแม่นยำ: <span className="font-bold text-slate-800">{(confidence * 100).toFixed(0)}%</span>
-          </p>
+        {/* ส่วนแสดงวิดีโอตัวอย่างท่าทาง */}
+        <div className="mt-6 aspect-video bg-black rounded-2xl overflow-hidden shadow-inner flex items-center justify-center relative">
+          {lessonData?.video_url ? (
+            <video
+              src={lessonData.video_url}
+              controls
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="text-center p-6">
+              <span className="text-white text-lg font-medium block">
+                🎥 วิดีโอตัวอย่างท่าทางภาษามือ
+              </span>
+              <a
+                href="https://dic.ttrs.or.th/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 text-sm underline mt-2 inline-block"
+              >
+                ดูตัวอย่างเพิ่มเติมจากแหล่งข้อมูลภายนอก (TTRS)
+              </a>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* คำแนะนำเพิ่มเติมสำหรับผู้เรียน */}
+        <div className="mt-6 bg-sky-50 p-5 rounded-2xl border border-sky-200">
+          <h2 className="text-lg font-bold text-slate-700">📌 คำแนะนำในการฝึก</h2>
+          <ul className="list-disc list-inside text-gray-600 mt-2 space-y-1">
+            <li>จัดตำแหน่งตัวให้พอดีกับกล้องและมีแสงสว่างเพียงพอ</li>
+            <li>สังเกตลักษณะนิ้วและทิศทางมือจากวิดีโอตัวอย่าง</li>
+            <li>เมื่อพร้อมแล้ว สามารถกดปุ่มเปิดกล้องเพื่อเริ่มประเมินท่าทางกับ AI ได้ทันที</li>
+          </ul>
+        </div>
+
+        {/* ปุ่มกดเปิดกล้องเพื่อไปหน้า Practice */}
+        <div className="mt-8 flex justify-end">
+          <button
+            onClick={() => navigate(`/practice/${id}`)}
+            className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-blue-700 transition shadow-lg flex items-center gap-2"
+          >
+            🚀 พร้อมแล้ว เปิดกล้องฝึกกับ AI
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
