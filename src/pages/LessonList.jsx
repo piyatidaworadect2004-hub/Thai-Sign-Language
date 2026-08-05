@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function LessonList() {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const location = useLocation();
 
-    // ดึงข้อมูลหมวดหมู่และบทเรียนจาก Backend ของคุณ
+    // อ่านค่า categoryId ที่ CategoryCard.jsx ส่งมาผ่าน navigate state
+    // ถ้ามี = ผู้ใช้กดมาจากหมวดใดหมวดหนึ่งในหน้าแรก ให้โชว์แค่หมวดนั้น
+    // ถ้าไม่มี (เช่น เข้า /lessons ตรงๆ ผ่าน URL) ให้โชว์ทุกหมวดเหมือนเดิม (fallback)
+    const selectedCategoryId = location.state?.categoryId;
+
     useEffect(() => {
         async function fetchLessons() {
             try {
-                // ปรับ URL ตาม Endpoint ของ Backend ที่คุณเตรียมไว้สำหรับดึงหมวดหมู่และบทเรียน
-                const response = await fetch("http://localhost:8000/categories"); 
+                const response = await fetch("http://localhost:8000/categories");
                 if (response.ok) {
                     const data = await response.json();
                     setCategories(data);
@@ -26,6 +30,11 @@ export default function LessonList() {
         fetchLessons();
     }, []);
 
+    // กรองให้เหลือแค่หมวดที่เลือกมา (ถ้ามี categoryId ติดมา)
+    const displayedCategories = selectedCategoryId
+        ? categories.filter((c) => String(c.id) === String(selectedCategoryId))
+        : categories;
+
     if (loading) {
         return (
             <div className="min-h-screen bg-sky-100 flex items-center justify-center">
@@ -36,44 +45,81 @@ export default function LessonList() {
 
     return (
         <div className="min-h-screen bg-sky-100 p-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">รายการบทเรียนภาษามือ</h1>
-            <p className="text-lg text-gray-600 mb-8">เลือกหมวดหมู่และคำศัพท์ที่คุณต้องการฝึกซ้อม</p>
+            {selectedCategoryId && (
+                <button
+                    onClick={() => navigate("/home")}
+                    className="bg-gray-500 text-white px-5 py-2 rounded-xl mb-6 hover:bg-gray-600 transition"
+                >
+                    ← กลับหน้าหลัก
+                </button>
+            )}
 
-            {categories.length === 0 ? (
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">
+                {selectedCategoryId
+                    ? location.state?.categoryTitle || "คำศัพท์ในหมวดนี้"
+                    : "รายการบทเรียนภาษามือ"}
+            </h1>
+            <p className="text-lg text-gray-600 mb-8">เลือกคำศัพท์ที่คุณต้องการฝึกซ้อม</p>
+
+            {displayedCategories.length === 0 ? (
                 <div className="bg-white rounded-2xl shadow-md p-6 text-center max-w-md mx-auto">
                     <p className="text-gray-500">ยังไม่มีข้อมูลบทเรียนในระบบ</p>
                 </div>
             ) : (
                 <div className="space-y-8">
-                    {categories.map((category) => (
+                    {displayedCategories.map((category) => (
                         <div key={category.id} className="bg-white rounded-3xl shadow-md p-6 border-2 border-white">
                             <h2 className="text-2xl font-bold text-blue-600 mb-4">
                                 {category.name}
                             </h2>
-                            
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {category.lessons && category.lessons.map((lesson) => (
-                                    <div
-                                        key={lesson.id}
-                                        onClick={() => navigate(`/practice/${lesson.id}`)}
-                                        className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-5 cursor-pointer hover:bg-sky-100 hover:border-blue-400 transition shadow-sm flex flex-col justify-between"
-                                    >
-                                        <div>
-                                            <h3 className="text-xl font-bold text-gray-800 mb-1">
-                                                {lesson.word || lesson.title}
-                                            </h3>
-                                            <p className="text-sm text-gray-500 line-clamp-2">
-                                                {lesson.description || "ฝึกท่าทางภาษามือบทเรียนนี้"}
-                                            </p>
+                                {category.lessons && category.lessons.map((lesson) => {
+                                    const isActive = lesson.is_active ?? lesson.isActive ?? false;
+
+                                    return (
+                                        <div
+                                            key={lesson.id}
+                                            onClick={() => {
+                                                if (!isActive) return;
+                                                navigate(`/practice/${lesson.id}`, {
+                                                    state: {
+                                                        word: lesson.word || lesson.title,
+                                                        isActive,
+                                                    },
+                                                });
+                                            }}
+                                            className={`rounded-2xl p-5 shadow-sm flex flex-col justify-between transition border-2 ${
+                                                isActive
+                                                    ? "bg-sky-50 border-sky-200 cursor-pointer hover:bg-sky-100 hover:border-blue-400"
+                                                    : "bg-gray-100 border-gray-200 cursor-not-allowed opacity-60"
+                                            }`}
+                                        >
+                                            <div>
+                                                <h3 className="text-xl font-bold text-gray-800 mb-1">
+                                                    {lesson.word || lesson.title}
+                                                </h3>
+                                                <p className="text-sm text-gray-500 line-clamp-2">
+                                                    {lesson.description || "ฝึกท่าทางภาษามือบทเรียนนี้"}
+                                                </p>
+                                            </div>
+                                            <div className="mt-4 flex items-center justify-between">
+                                                {isActive ? (
+                                                    <>
+                                                        <span className="text-xs bg-blue-500 text-white px-3 py-1 rounded-full font-semibold">
+                                                            เริ่มฝึกซ้อม
+                                                        </span>
+                                                        <span className="text-blue-600 font-bold">→</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-xs bg-gray-400 text-white px-3 py-1 rounded-full font-semibold">
+                                                        🔒 เร็วๆ นี้
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="mt-4 flex items-center justify-between">
-                                            <span className="text-xs bg-blue-500 text-white px-3 py-1 rounded-full font-semibold">
-                                                เริ่มฝึกซ้อม
-                                            </span>
-                                            <span className="text-blue-600 font-bold">→</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}

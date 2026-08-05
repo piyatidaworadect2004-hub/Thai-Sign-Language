@@ -107,7 +107,7 @@ export default function CategoryCard({
 
       {/* ปุ่มเริ่มเรียน */}
       <button
-        onClick={() => navigate(`/lesson/${id}`)}
+        onClick={() => navigate("/lessons", { state: { categoryId: id, categoryTitle: title } })}
         className="
           w-full
           mt-6

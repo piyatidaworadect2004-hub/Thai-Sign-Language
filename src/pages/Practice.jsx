@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 
 const HAND_CONNECTIONS = [
@@ -11,12 +11,12 @@ const HAND_CONNECTIONS = [
     [0, 17]
 ];
 
-const TARGET_WORD = "ขอบคุณ";
 const RECORD_DURATION_MS = 3000;
 
 export default function Practice() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -35,8 +35,49 @@ export default function Practice() {
     const [compareResult, setCompareResult] = useState(null);
     const [compareError, setCompareError] = useState("");
 
+    const [targetWord, setTargetWord] = useState(location.state?.word || "");
+    const [isActive, setIsActive] = useState(location.state?.isActive ?? null);
+    const [lessonLoading, setLessonLoading] = useState(!location.state);
+
     const lastPredictTime = useRef(0);
     const isMounted = useRef(true);
+
+    useEffect(() => {
+        if (location.state?.word) return;
+
+        async function fetchLessonInfo() {
+            try {
+                const response = await fetch("http://localhost:8000/categories");
+                if (!response.ok) throw new Error("โหลดข้อมูลบทเรียนไม่สำเร็จ");
+                const data = await response.json();
+
+                let found = null;
+                for (const category of data) {
+                    const lesson = category.lessons?.find(
+                        (l) => String(l.id) === String(id)
+                    );
+                    if (lesson) {
+                        found = lesson;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    setTargetWord(found.word || found.title || "");
+                    setIsActive(found.is_active ?? found.isActive ?? false);
+                } else {
+                    setIsActive(false);
+                }
+            } catch (error) {
+                console.error("โหลดข้อมูลบทเรียนล้มเหลว:", error);
+                setIsActive(false);
+            } finally {
+                setLessonLoading(false);
+            }
+        }
+
+        fetchLessonInfo();
+    }, [id, location.state]);
 
     async function predictSign(handData, worldHandData) {
         try {
@@ -79,7 +120,6 @@ export default function Practice() {
 
         const stream = videoRef.current.srcObject;
 
-        // รองรับการใช้งานบน Safari/iOS
         let mimeType = "video/webm";
         if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) {
             mimeType = "video/webm;codecs=vp8";
@@ -121,7 +161,7 @@ export default function Practice() {
         try {
             const token = localStorage.getItem("token");
             const formData = new FormData();
-            formData.append("word", TARGET_WORD);
+            formData.append("word", targetWord);
             formData.append("lesson_id", id || "1");
             formData.append("file", blob, "practice.webm");
 
@@ -149,6 +189,9 @@ export default function Practice() {
     }
 
     useEffect(() => {
+        if (lessonLoading) return;
+        if (isActive === false) return;
+
         isMounted.current = true;
         let handLandmarkerInstance = null;
         let animationId = null;
@@ -201,9 +244,8 @@ export default function Practice() {
                         canvasRef.current &&
                         handLandmarkerInstance
                     )
-                
+
                     {
-                        // แก้ไข: ใช้ performance.now() แทน Date.now()
                         const results = handLandmarkerInstance.detectForVideo(
                             videoRef.current,
                             performance.now()
@@ -226,12 +268,10 @@ export default function Practice() {
                             const handData = [];
                             const worldHandData = [];
 
-                            // วนลูปจัดการมือทุกข้างที่ตรวจพบ (สูงสุด 2 ข้าง)
                             results.landmarks.forEach((landmarks, handIndex) => {
                             const worldLandmarks = results.worldLandmarks?.[handIndex] || [];
-                            
-                            
-                            // เก็บพิกัดมือ
+
+
                             landmarks.forEach((point) => {
                                 handData.push(point.x, point.y, point.z);
                             });
@@ -239,8 +279,7 @@ export default function Practice() {
                             worldLandmarks.forEach((point) => {
                                 worldHandData.push(point.x, point.y, point.z);
                             });
-                            
-                            // วาดเส้นที่มือ
+
                             HAND_CONNECTIONS.forEach(([start, end]) => {
                                 const p1 = landmarks[start];
                                 const p2 = landmarks[end];
@@ -253,7 +292,6 @@ export default function Practice() {
                                 ctx.stroke();
                             });
 
-                            // วาดจุดที่มนิ้วมือ
                             landmarks.forEach((point) => {
                                 ctx.beginPath();
                                 ctx.arc(
@@ -318,7 +356,36 @@ export default function Practice() {
             }
         };
 
-    }, [id]);
+    }, [id, lessonLoading, isActive]);
+
+    if (lessonLoading) {
+        return (
+            <div className="min-h-screen bg-sky-100 flex items-center justify-center">
+                <p className="text-xl font-bold text-blue-600">กำลังโหลดข้อมูลบทเรียน...</p>
+            </div>
+        );
+    }
+
+    if (isActive === false) {
+        return (
+            <div className="min-h-screen bg-sky-100 p-8">
+                <button
+                    onClick={() => navigate(-1)}
+                    className="bg-gray-500 text-white px-5 py-2 rounded-xl mb-8 hover:bg-gray-600 transition"
+                >
+                    ← กลับ
+                </button>
+
+                <div className="max-w-md mx-auto bg-white rounded-3xl shadow-md p-8 text-center">
+                    <p className="text-5xl mb-4">🔒</p>
+                    <h1 className="text-2xl font-bold text-gray-800 mb-2">คำนี้ยังฝึกไม่ได้</h1>
+                    <p className="text-gray-500">
+                        ระบบยังไม่รองรับการตรวจจับท่ามือคำนี้ กรุณาเลือกคำอื่นที่พร้อมฝึกก่อน
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-sky-100 p-8">
@@ -332,14 +399,9 @@ export default function Practice() {
             <h1 className="text-4xl font-bold">ฝึกท่าทางภาษามือ</h1>
 
             <p className="text-xl mt-4">สวัสดี ID : {id}</p>
-            <p className="text-lg mt-1 text-gray-600">คำที่กำลังฝึก: <span className="font-bold text-blue-600">{TARGET_WORD}</span></p>
+            <p className="text-lg mt-1 text-gray-600">คำที่กำลังฝึก: <span className="font-bold text-blue-600">{targetWord}</span></p>
 
-            <a
-                href="https://dic.ttrs.or.th/video/view/61c5797966b04b724e244611"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 mt-4 bg-blue-500 text-white px-5 py-2 rounded-xl hover:bg-blue-600 transition"
-            >
+            <a href="https://dic.ttrs.or.th/video/view/61c5797966b04b724e244611" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-4 bg-blue-500 text-white px-5 py-2 rounded-xl hover:bg-blue-600 transition">
                 ดูตัวอย่างท่าภาษามือจาก TTRS
             </a>
 

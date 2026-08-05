@@ -9,9 +9,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    
+
     password_hash = Column(String, nullable=False)
-    
+
     full_name = Column(String, nullable=True)
     role = Column(String, default="user")
 
@@ -24,7 +24,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
-    
+
     level = Column(String, nullable=True)   # เปลี่ยนจาก difficulty -> level
     image = Column(String, nullable=True)
     total_words = Column(Integer, default=0)
@@ -41,6 +41,7 @@ class Lesson(Base):
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
     video_url = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=False)   # ★ เพิ่ม: คำนี้ AI ตรวจจับได้จริงหรือยัง
 
     category = relationship("Category", back_populates="lessons")
 
