@@ -6,6 +6,7 @@ from datetime import datetime
 
 import cv2
 import numpy as np
+import mediapipe as mp
 from fastapi import FastAPI, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ from pydantic import BaseModel
 
 # Import Database, Models และ Routers ทั้งหมด
 from app.database import engine, Base, get_db
-from app.routers import auth, category, lesson, practice, progress, quiz
+from app.routers import auth, category, lesson, practice, progress, quiz, practice_compare
 from app.routers.auth import get_current_user
 from app.models import User, Category, UserProgress, PracticeLog
 Base.metadata.create_all(bind=engine)
@@ -55,21 +56,24 @@ app.include_router(lesson.router, prefix="/lessons", tags=["Lessons"])
 app.include_router(practice.router, prefix="/practice", tags=["Practice"])
 app.include_router(progress.router, prefix="/progress", tags=["Progress"])
 app.include_router(quiz.router, prefix="/quizzes", tags=["Quizzes"])
+app.include_router(practice_compare.router, prefix="/practice-compare", tags=["Practice Compare"])
 
 # Instance MediaPipe Hands Detector
-hands_detector = None
-if mp_hands and hasattr(mp_hands, "Hands"):
-    hands_detector = mp_hands.Hands(
-        static_image_mode=False,
-        max_num_hands=2,
-        min_detection_confidence=0.3,
-        min_tracking_confidence=0.3
-    )
+mp_hands = mp.solutions.hands
 
+# 🟢 ตั้งค่าให้รองรับการตรวจจับสูงสุด 2 มือ
+hands_detector = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=2,            # 👈 รองรับสูงสุด 2 มือ
+    min_detection_confidence=0.3,
+    min_tracking_confidence=0.3
+)
+
+# 🟢 เปลี่ยนจาก difficulty -> level และลบ color ออก ให้ตรงกับ DB จริง (Supabase: category table)
 BASE_CATEGORIES = [
-    {"id": 1, "name": "คำทักทาย", "total_words": 5, "difficulty": "ง่าย", "image": "👋", "color": "bg-blue-400"},
-    {"id": 2, "name": "ครอบครัว", "total_words": 5, "difficulty": "ปานกลาง", "image": "👨‍👩‍👧", "color": "bg-green-400"},
-    {"id": 3, "name": "อาหาร", "total_words": 5, "difficulty": "ง่าย", "image": "🍜", "color": "bg-orange-400"}
+    {"id": 1, "name": "คำทักทาย", "total_words": 5, "level": "ง่าย", "image": "👋"},
+    {"id": 2, "name": "ครอบครัว", "total_words": 5, "level": "ปานกลาง", "image": "👨‍👩‍👧"},
+    {"id": 3, "name": "อาหาร", "total_words": 5, "level": "ง่าย", "image": "🍜"}
 ]
 
 words = [
@@ -189,7 +193,6 @@ def predict(
         "is_correct": is_correct
     }
 
-# 🟢 รองรับทั้ง /practice-history และ /progress เพื่อป้องกันปัญหาเรียกผิด Route
 @app.get("/practice-history")
 @app.get("/progress")
 def get_practice_history(
@@ -202,7 +205,6 @@ def get_practice_history(
              .limit(50)\
              .all()
              
-    # แปลงโครงสร้างข้อมูลให้หน้า Dashboard อ่านค่า `lesson` และ `confidence` ได้อย่างถูกต้อง
     formatted_logs = []
     for log in logs:
         formatted_logs.append({
@@ -243,11 +245,23 @@ async def websocket_stream(websocket: WebSocket):
                         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         results = hands_detector.process(rgb_frame)
 
+                        # 🟢 รองรับการตรวจจับ 2 มือพร้อมกัน
                         if results.multi_hand_landmarks:
-                            hand_landmarks = results.multi_hand_landmarks[0]
-                            for lm in hand_landmarks.landmark:
-                                landmarks_list.append({"x": lm.x, "y": lm.y, "z": lm.z})
-
+                            all_hands_data = []
+                            
+                            for idx, hand_landmarks in enumerate(results.multi_hand_landmarks):
+                                hand_side = results.multi_handedness[idx].classification[0].label # Left หรือ Right
+                                
+                                single_hand_pts = []
+                                for lm in hand_landmarks.landmark:
+                                    single_hand_pts.append({"x": lm.x, "y": lm.y, "z": lm.z})
+                                
+                                all_hands_data.append({
+                                    "hand": hand_side,
+                                    "landmarks": single_hand_pts
+                                })
+                            
+                            landmarks_list = all_hands_data
                             detected_word = target_word if target_word else "สวัสดี"
                             accuracy = random.randint(88, 98)
 

@@ -1,17 +1,22 @@
 import { useNavigate } from "react-router-dom";
 
+const levelBorderColor = {
+  ง่าย: "#4ade80",     // เขียว
+  ปานกลาง: "#facc15",  // เหลือง
+  ยาก: "#f87171",      // แดง
+};
+
 export default function CategoryCard({
   id,
   title,
   lessons,
-  difficulty,
+  level,
   progress = 0,
   image,
-  color = "#ffffff",
 }) {
   const navigate = useNavigate();
 
-  const difficultyColor = {
+  const levelColor = {
     ง่าย: "bg-green-100 text-green-700",
     ปานกลาง: "bg-yellow-100 text-yellow-700",
     ยาก: "bg-red-100 text-red-700",
@@ -21,7 +26,7 @@ export default function CategoryCard({
     <div
       className="rounded-3xl shadow-lg hover:shadow-2xl duration-300 p-6 cursor-pointer bg-white"
       style={{
-        borderTop: `8px solid ${color}`,
+        borderTop: `8px solid ${levelBorderColor[level] || "#94a3b8"}`,
       }}
     >
 
@@ -63,11 +68,11 @@ export default function CategoryCard({
       <div className="flex justify-center mt-4">
         <span
           className={`px-4 py-1 rounded-full text-sm font-medium ${
-            difficultyColor[difficulty] ||
+            levelColor[level] ||
             "bg-gray-100 text-gray-700"
           }`}
         >
-          {difficulty || "ไม่ระบุ"}
+          {level || "ไม่ระบุ"}
         </span>
       </div>
 

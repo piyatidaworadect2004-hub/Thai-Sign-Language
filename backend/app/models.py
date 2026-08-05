@@ -25,10 +25,10 @@ class Category(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     
-    difficulty = Column(String, nullable=True)
-    color = Column(String, nullable=True)
+    level = Column(String, nullable=True)   # เปลี่ยนจาก difficulty -> level
     image = Column(String, nullable=True)
     total_words = Column(Integer, default=0)
+    # ลบ color ออก เพราะ DB ไม่มีคอลัมน์นี้
 
     lessons = relationship("Lesson", back_populates="category", cascade="all, delete-orphan")
     progress = relationship("UserProgress", back_populates="category")

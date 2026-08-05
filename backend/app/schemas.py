@@ -31,20 +31,18 @@ class UserOut(UserBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-# 🟢 --- Category Schemas (เพิ่ม Field รองรับการ Insert และ UI) ---
 class CategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
     total_words: Optional[int] = 0
-    difficulty: Optional[str] = "ง่าย"
-    color: Optional[str] = "bg-blue-500"
+    level: Optional[str] = "ง่าย"   # เปลี่ยนจาก difficulty -> level
     image: Optional[str] = ""
+    # ลบ color ออก
 
 class CategoryOut(CategoryBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
-
 # --- Lesson Schemas ---
 class LessonBase(BaseModel):
     category_id: int

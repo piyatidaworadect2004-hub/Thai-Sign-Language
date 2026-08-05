@@ -65,10 +65,9 @@ export default function Home() {
                 id={category.id}
                 title={category.name}
                 lessons={category.total_words}
-                difficulty={category.difficulty}
+                level={category.level}
                 progress={category.progress}
                 image={category.image}
-                color={category.color}
               />
             ))
           ) : (
@@ -89,7 +88,7 @@ export default function Home() {
               <RecommendationCard 
                 key={category.id}
                 title={category.name} 
-                level={category.difficulty} 
+                level={category.level} 
               />
             ))
           ) : (

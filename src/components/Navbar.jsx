@@ -1,49 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom'; // 🟢 เพิ่ม Link ถ้ารองรับ หรือใช้ a ตามโค้ดเดิม
 
 export default function Navbar() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false); // 👈 สร้าง State เช็กสิทธิ์แอดมิน
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // 🔍 ดึงข้อมูลที่เซฟไว้ตอน Login
     const storedUsername = localStorage.getItem('username');
-    const storedRole = localStorage.getItem('role'); // 👈 ดึงค่า role มาเช็ก
+    const storedRole = localStorage.getItem('role');
 
     if (storedUsername) {
       setUsername(storedUsername);
     }
 
-    // 🛡️ ถ้า role เป็น admin ให้เปลี่ยนค่าเป็น true
     if (storedRole === 'admin') {
       setIsAdmin(true);
     }
   }, []);
 
-  // 🚪 ฟังก์ชันกดออกจากระบบ
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    localStorage.removeItem('role'); // 👈 ลบ role ออกตอน Logout ด้วย
+    localStorage.removeItem('role');
     navigate('/login');
   };
 
   return (
     <nav className="flex items-center justify-between px-8 py-4 bg-white shadow-sm">
       {/* ฝั่งซ้าย: ชื่อโปรเจกต์ */}
-      <div className="text-xl font-bold text-blue-600">
+      <div 
+        className="text-xl font-bold text-blue-600 cursor-pointer" 
+        onClick={() => navigate('/home')}
+      >
         Thai Sign Learning
       </div>
 
       {/* ฝั่งขวา: รายการเมนู และ ส่วนชื่อผู้ใช้/Logout */}
       <div className="flex items-center space-x-6 font-medium text-gray-700">
         <a href="/home" className="hover:text-blue-600 transition">หน้าหลัก</a>
-        <a href="#lessons" className="hover:text-blue-600 transition">บทเรียน</a>
-        <a href="#predict" className="hover:text-blue-600 transition">ฝึก AI</a>
-        <a href="#quiz" className="hover:text-blue-600 transition">แบบทดสอบ</a>
+        <a href="/lessons" className="hover:text-blue-600 transition">บทเรียน</a>
+        <a href="/practice" className="hover:text-blue-600 transition">ฝึก AI</a>
+        <a href="/quiz" className="hover:text-blue-600 transition">แบบทดสอบ</a>
 
-        {/* ⚙️ ปุ่มเมนูแอดมิน (จะแสดงก็ต่อเมื่อ isAdmin เป็น true) */}
+        {/* 📊 เมนูกดไปหน้าแดชบอร์ดความคืบหน้า */}
+        <a 
+          href="/dashboard" 
+          className="text-blue-600 font-bold hover:text-blue-800 transition bg-blue-50 px-3 py-1 rounded-full text-sm border border-blue-200"
+        >
+          📊 แดชบอร์ด
+        </a>
+
+        {/* ⚙️ ปุ่มเมนูแอดมิน (แสดงเฉพาะแอดมิน) */}
         {isAdmin && (
           <a 
             href="/admin-dashboard" 

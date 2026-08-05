@@ -11,12 +11,17 @@ const HAND_CONNECTIONS = [
     [0, 17]
 ];
 
+const TARGET_WORD = "ขอบคุณ";
+const RECORD_DURATION_MS = 3000;
+
 export default function Practice() {
     const { id } = useParams();
     const navigate = useNavigate();
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const recordedChunksRef = useRef([]);
 
     const [cameraOn, setCameraOn] = useState(false);
     const [handDetected, setHandDetected] = useState(false);
@@ -25,21 +30,22 @@ export default function Practice() {
     const [confidence, setConfidence] = useState(0);
     const [debug, setDebug] = useState("");
 
-    const lastPredictTime = useRef(0);
-    // ใช้ Ref เพื่อเช็กว่า Component ยังอยู่ไหมก่อน setState
-    const isMounted = useRef(true); 
+    const [isRecording, setIsRecording] = useState(false);
+    const [isComparing, setIsComparing] = useState(false);
+    const [compareResult, setCompareResult] = useState(null);
+    const [compareError, setCompareError] = useState("");
 
-    // ==========================
-    // ส่งข้อมูลไป AI พร้อมแนบ Token ยืนยันตัวตน
-    // ==========================
+    const lastPredictTime = useRef(0);
+    const isMounted = useRef(true);
+
     async function predictSign(handData, worldHandData) {
         try {
-            const token = localStorage.getItem("token"); // ดึง Token ของผู้ใช้ที่ล็อกอินอยู่
+            const token = localStorage.getItem("token");
             const response = await fetch("http://localhost:8000/predict", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(token && { Authorization: `Bearer ${token}` }) // แนบ Token ไปด้วย
+                    ...(token && { Authorization: `Bearer ${token}` })
                 },
                 body: JSON.stringify({
                     lesson_id: id,
@@ -53,19 +59,101 @@ export default function Practice() {
             const result = await response.json();
 
             if (isMounted.current) {
-                setPrediction(result.word);
-                setConfidence(result.confidence);
+                setPrediction(result.word || "");
+                setConfidence(result.confidence || 0);
             }
         } catch (error) {
             console.log("Predict API ยังไม่พร้อม");
         }
     }
 
+    function startRecordingAndCompare() {
+        if (!videoRef.current?.srcObject) {
+            setCompareError("กล้องยังไม่พร้อม");
+            return;
+        }
+
+        setCompareResult(null);
+        setCompareError("");
+        recordedChunksRef.current = [];
+
+        const stream = videoRef.current.srcObject;
+
+        // รองรับการใช้งานบน Safari/iOS
+        let mimeType = "video/webm";
+        if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) {
+            mimeType = "video/webm;codecs=vp8";
+        } else if (MediaRecorder.isTypeSupported("video/mp4")) {
+            mimeType = "video/mp4";
+        }
+
+        try {
+            const recorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = recorder;
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+            };
+
+            recorder.onstop = async () => {
+                if (isMounted.current) setIsRecording(false);
+                const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+                await sendVideoForCompare(blob);
+            };
+
+            recorder.start();
+            setIsRecording(true);
+
+            setTimeout(() => {
+                if (mediaRecorderRef.current?.state === "recording") {
+                    mediaRecorderRef.current.stop();
+                }
+            }, RECORD_DURATION_MS);
+        } catch (err) {
+            setCompareError("เบราว์เซอร์ไม่รองรับการบันทึกวิดีโอรูปแบบนี้");
+        }
+    }
+
+    async function sendVideoForCompare(blob) {
+        setIsComparing(true);
+        setCompareError("");
+
+        try {
+            const token = localStorage.getItem("token");
+            const formData = new FormData();
+            formData.append("word", TARGET_WORD);
+            formData.append("lesson_id", id || "1");
+            formData.append("file", blob, "practice.webm");
+
+            const response = await fetch("http://localhost:8000/practice-compare/compare", {
+                method: "POST",
+                headers: {
+                    ...(token && { Authorization: `Bearer ${token}` })
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText || `เกิดข้อผิดพลาด (${response.status})`);
+            }
+
+            const result = await response.json();
+            if (isMounted.current) setCompareResult(result);
+        } catch (error) {
+            console.error("Compare API error:", error);
+            if (isMounted.current) setCompareError(error.message || "เกิดข้อผิดพลาดในการเปรียบเทียบ");
+        } finally {
+            if (isMounted.current) setIsComparing(false);
+        }
+    }
+
     useEffect(() => {
         isMounted.current = true;
-        let handLandmarker;
-        let animationId;
-        let localHandDetected = false; // ตัวแปรคุม Local State ไม่ให้สั่ง React Re-render ทุกเฟรม
+        let handLandmarkerInstance = null;
+        let animationId = null;
+        let currentStream = null;
+        let localHandDetected = false;
 
         async function setup() {
             try {
@@ -74,6 +162,12 @@ export default function Practice() {
                     audio: false,
                 });
 
+                if (!isMounted.current) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
+                currentStream = stream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                     await videoRef.current.play();
@@ -83,7 +177,9 @@ export default function Practice() {
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
                 );
 
-                handLandmarker = await HandLandmarker.createFromOptions(
+                if (!isMounted.current) return;
+
+                handLandmarkerInstance = await HandLandmarker.createFromOptions(
                     vision,
                     {
                         baseOptions: {
@@ -99,13 +195,16 @@ export default function Practice() {
 
                 function detectHands() {
                     if (
+                        isMounted.current &&
                         videoRef.current &&
                         videoRef.current.readyState === 4 &&
-                        canvasRef.current
+                        canvasRef.current &&
+                        handLandmarkerInstance
                     ) {
-                        const results = handLandmarker.detectForVideo(
+                        // แก้ไข: ใช้ performance.now() แทน Date.now()
+                        const results = handLandmarkerInstance.detectForVideo(
                             videoRef.current,
-                            Date.now()
+                            performance.now()
                         );
 
                         const canvas = canvasRef.current;
@@ -128,24 +227,20 @@ export default function Practice() {
                             const handData = [];
                             const worldHandData = [];
 
-                            // Landmarks (Normalized)
                             landmarks.forEach((point) => {
                                 handData.push(point.x, point.y, point.z);
                             });
 
-                            // World Landmarks (3D)
                             worldLandmarks.forEach((point) => {
                                 worldHandData.push(point.x, point.y, point.z);
                             });
 
-                            // Throttle การยิง API ทุกๆ 500ms
                             const now = Date.now();
                             if (now - lastPredictTime.current > 500) {
                                 lastPredictTime.current = now;
                                 predictSign(handData, worldHandData);
                             }
 
-                            // 🟢 1. วาดเส้นเชื่อมต่อ (Skeleton Lines)
                             HAND_CONNECTIONS.forEach(([start, end]) => {
                                 const p1 = landmarks[start];
                                 const p2 = landmarks[end];
@@ -158,7 +253,6 @@ export default function Practice() {
                                 ctx.stroke();
                             });
 
-                            // 🔴 2. วาดจุด Joint (21 จุด)
                             landmarks.forEach((point) => {
                                 ctx.beginPath();
                                 ctx.arc(
@@ -188,7 +282,9 @@ export default function Practice() {
                         }
                     }
 
-                    animationId = requestAnimationFrame(detectHands);
+                    if (isMounted.current) {
+                        animationId = requestAnimationFrame(detectHands);
+                    }
                 }
 
                 detectHands();
@@ -203,14 +299,18 @@ export default function Practice() {
         return () => {
             isMounted.current = false;
             if (animationId) cancelAnimationFrame(animationId);
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
             if (videoRef.current?.srcObject) {
-                videoRef.current.srcObject
-                    .getTracks()
-                    .forEach(track => track.stop());
+                videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+            }
+            if (handLandmarkerInstance) {
+                handLandmarkerInstance.close();
             }
         };
 
-    }, []);
+    }, [id]);
 
     return (
         <div className="min-h-screen bg-sky-100 p-8">
@@ -224,6 +324,7 @@ export default function Practice() {
             <h1 className="text-4xl font-bold">ฝึกท่าทางภาษามือ</h1>
 
             <p className="text-xl mt-4">สวัสดี ID : {id}</p>
+            <p className="text-lg mt-1 text-gray-600">คำที่กำลังฝึก: <span className="font-bold text-blue-600">{TARGET_WORD}</span></p>
 
             <a
                 href="https://dic.ttrs.or.th/video/view/61c5797966b04b724e244611"
@@ -234,7 +335,6 @@ export default function Practice() {
                 ดูตัวอย่างท่าภาษามือจาก TTRS
             </a>
 
-            {/* 🟢 วิดีโอและ Canvas พร้อมสไตล์ Mirror */}
             <div className="relative max-w-3xl mt-8 overflow-hidden rounded-3xl border-4 border-white shadow-xl bg-black">
                 <video
                     ref={videoRef}
@@ -249,6 +349,12 @@ export default function Practice() {
                     className="absolute top-0 left-0 w-full h-full pointer-events-none"
                     style={{ transform: "scaleX(-1)" }}
                 />
+
+                {isRecording && (
+                    <div className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold animate-pulse">
+                        🔴 กำลังอัด...
+                    </div>
+                )}
             </div>
 
             {cameraOn && (
@@ -265,11 +371,51 @@ export default function Practice() {
 
             {prediction && (
                 <div className="mt-6 max-w-md bg-white rounded-2xl shadow-lg p-6 border-2 border-blue-400">
-                    <h2 className="text-2xl font-bold mb-3">ผลการตรวจจับ</h2>
+                    <h2 className="text-2xl font-bold mb-3">ผลการตรวจจับ (Preview สด)</h2>
                     <p className="text-4xl font-bold text-blue-600">{prediction}</p>
                     <p className="mt-2 text-lg">
-                        ค่าความมั่นใจ : {(confidence * 100).toFixed(2)}%
+                        ค่าความมั่นใจ : {((confidence || 0) * 100).toFixed(2)}%
                     </p>
+                </div>
+            )}
+
+            <div className="mt-8">
+                <button
+                    onClick={startRecordingAndCompare}
+                    disabled={!cameraOn || isRecording || isComparing}
+                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white px-8 py-4 rounded-xl font-bold text-lg transition"
+                >
+                    {isRecording
+                        ? "🔴 กำลังอัด..."
+                        : isComparing
+                        ? "⏳ กำลังตรวจสอบ..."
+                        : `🎥 เริ่มบันทึกท่า (${RECORD_DURATION_MS / 1000} วินาที)`}
+                </button>
+            </div>
+
+            {compareError && (
+                <div className="mt-4 max-w-md bg-red-50 border-2 border-red-300 rounded-2xl p-4">
+                    <p className="text-red-600 font-semibold">{compareError}</p>
+                </div>
+            )}
+
+            {compareResult && (
+                <div className={`mt-6 max-w-md rounded-2xl shadow-lg p-6 border-2 ${
+                    compareResult.is_pass ? "bg-green-50 border-green-400" : "bg-red-50 border-red-400"
+                }`}>
+                    <h2 className="text-2xl font-bold mb-3">ผลการตรวจสอบท่า (เทียบกับ Ground Truth)</h2>
+                    <p className={`text-4xl font-bold ${compareResult.is_pass ? "text-green-600" : "text-red-600"}`}>
+                        {compareResult.is_pass ? "✅ ผ่าน" : "❌ ยังไม่ผ่าน"}
+                    </p>
+                    <p className="mt-2 text-lg">
+                        ความแม่นยำ: {compareResult.correctness_percentage}%
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                        DTW Score: {compareResult.best_score} (threshold = {compareResult.threshold})
+                    </p>
+                    {compareResult.log_id && (
+                        <p className="mt-1 text-sm text-gray-500">บันทึกผลแล้ว (Log ID: {compareResult.log_id})</p>
+                    )}
                 </div>
             )}
         </div>
