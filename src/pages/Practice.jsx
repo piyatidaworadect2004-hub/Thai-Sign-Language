@@ -186,7 +186,7 @@ export default function Practice() {
                             modelAssetPath: "/models/hand_landmarker.task",
                         },
                         runningMode: "VIDEO",
-                        numHands: 1,
+                        numHands: 2,
                     }
                 );
 
@@ -200,7 +200,9 @@ export default function Practice() {
                         videoRef.current.readyState === 4 &&
                         canvasRef.current &&
                         handLandmarkerInstance
-                    ) {
+                    )
+                
+                    {
                         // แก้ไข: ใช้ performance.now() แทน Date.now()
                         const results = handLandmarkerInstance.detectForVideo(
                             videoRef.current,
@@ -221,12 +223,15 @@ export default function Practice() {
                                 if (isMounted.current) setHandDetected(true);
                             }
 
-                            const landmarks = results.landmarks[0];
-                            const worldLandmarks = results.worldLandmarks?.[0] || [];
-
                             const handData = [];
                             const worldHandData = [];
 
+                            // วนลูปจัดการมือทุกข้างที่ตรวจพบ (สูงสุด 2 ข้าง)
+                            results.landmarks.forEach((landmarks, handIndex) => {
+                            const worldLandmarks = results.worldLandmarks?.[handIndex] || [];
+                            
+                            
+                            // เก็บพิกัดมือ
                             landmarks.forEach((point) => {
                                 handData.push(point.x, point.y, point.z);
                             });
@@ -234,13 +239,8 @@ export default function Practice() {
                             worldLandmarks.forEach((point) => {
                                 worldHandData.push(point.x, point.y, point.z);
                             });
-
-                            const now = Date.now();
-                            if (now - lastPredictTime.current > 500) {
-                                lastPredictTime.current = now;
-                                predictSign(handData, worldHandData);
-                            }
-
+                            
+                            // วาดเส้นที่มือ
                             HAND_CONNECTIONS.forEach(([start, end]) => {
                                 const p1 = landmarks[start];
                                 const p2 = landmarks[end];
@@ -253,6 +253,7 @@ export default function Practice() {
                                 ctx.stroke();
                             });
 
+                            // วาดจุดที่มนิ้วมือ
                             landmarks.forEach((point) => {
                                 ctx.beginPath();
                                 ctx.arc(
@@ -262,12 +263,19 @@ export default function Practice() {
                                     0,
                                     2 * Math.PI
                                 );
-                                ctx.fillStyle = "#FF007F";
-                                ctx.fill();
-                                ctx.strokeStyle = "#FFFFFF";
-                                ctx.lineWidth = 1.5;
-                                ctx.stroke();
+                                    ctx.fillStyle = "#FF007F";
+                                    ctx.fill();
+                                    ctx.strokeStyle = "#FFFFFF";
+                                    ctx.lineWidth = 1.5;
+                                    ctx.stroke();
+                                });
                             });
+
+                            const now = Date.now();
+                            if (now - lastPredictTime.current > 500) {
+                                lastPredictTime.current = now;
+                                predictSign(handData, worldHandData);
+                            }
 
                         } else {
                             if (localHandDetected) {
@@ -282,9 +290,9 @@ export default function Practice() {
                         }
                     }
 
-                    if (isMounted.current) {
-                        animationId = requestAnimationFrame(detectHands);
-                    }
+                        if (isMounted.current) {
+                            animationId = requestAnimationFrame(detectHands);
+                        }
                 }
 
                 detectHands();
@@ -367,16 +375,6 @@ export default function Practice() {
 
             {debug && (
                 <p className="mt-2 text-purple-600 font-bold">{debug}</p>
-            )}
-
-            {prediction && (
-                <div className="mt-6 max-w-md bg-white rounded-2xl shadow-lg p-6 border-2 border-blue-400">
-                    <h2 className="text-2xl font-bold mb-3">ผลการตรวจจับ (Preview สด)</h2>
-                    <p className="text-4xl font-bold text-blue-600">{prediction}</p>
-                    <p className="mt-2 text-lg">
-                        ค่าความมั่นใจ : {((confidence || 0) * 100).toFixed(2)}%
-                    </p>
-                </div>
             )}
 
             <div className="mt-8">
