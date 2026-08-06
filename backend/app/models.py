@@ -14,6 +14,7 @@ class User(Base):
 
     full_name = Column(String, nullable=True)
     role = Column(String, default="user")
+    created_at = Column(DateTime, server_default=func.now())   # ★ เพิ่ม: ใช้คำนวณ "ผู้ใช้ใหม่" ใน Dashboard
 
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
     practice_logs = relationship("PracticeLog", back_populates="user", cascade="all, delete-orphan")

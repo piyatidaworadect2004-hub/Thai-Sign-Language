@@ -28,6 +28,7 @@ class UserCreate(UserBase):
 class UserOut(UserBase):
     id: int
     role: str
+    created_at: Optional[datetime] = None   # ★ เพิ่ม: ใช้คำนวณ "ผู้ใช้ใหม่" ใน Dashboard
 
     model_config = ConfigDict(from_attributes=True)
 
