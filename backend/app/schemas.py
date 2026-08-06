@@ -28,9 +28,30 @@ class UserCreate(UserBase):
 class UserOut(UserBase):
     id: int
     role: str
+    created_at: Optional[datetime] = None   # ★ เพิ่ม: ใช้คำนวณ "ผู้ใช้ใหม่" ใน Dashboard
 
     model_config = ConfigDict(from_attributes=True)
 
+
+# --- Lesson Schemas ---
+# ★ ย้ายมาไว้ก่อน CategoryOut เพราะ CategoryOut ต้อง reference LessonOut
+class LessonBase(BaseModel):
+    category_id: int
+    title: str
+    description: Optional[str] = None
+    video_url: Optional[str] = None
+    is_active: bool = False   # ★ เพิ่ม: ใช้บอก frontend ว่าคำนี้ฝึกได้จริงหรือยัง
+
+class LessonCreate(LessonBase):
+    pass
+
+class LessonOut(LessonBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Category Schemas ---
 class CategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -41,22 +62,11 @@ class CategoryBase(BaseModel):
 
 class CategoryOut(CategoryBase):
     id: int
+    lessons: List[LessonOut] = []          # ★ เพิ่ม: รายการคำศัพท์ในหมวดนี้
+    progress: int = 0                       # ★ เพิ่ม: completion_percentage ของ user ที่ login อยู่ (0 ถ้ายังไม่ login/ยังไม่ฝึก)
 
     model_config = ConfigDict(from_attributes=True)
-# --- Lesson Schemas ---
-class LessonBase(BaseModel):
-    category_id: int
-    title: str
-    description: Optional[str] = None
-    video_url: Optional[str] = None
 
-class LessonCreate(LessonBase):
-    pass
-
-class LessonOut(LessonBase):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
 
 # --- Quiz Schemas ---
 class QuizBase(BaseModel):
