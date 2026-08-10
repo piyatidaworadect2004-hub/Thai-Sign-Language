@@ -47,7 +47,7 @@ app.add_middleware(
 # 🟢 ลงทะเบียน Routers ครบทุกตัว
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(category.router, prefix="/categories", tags=["Categories"])
-app.include_router(lesson.router, prefix="/lessons", tags=["Lessons"])
+app.include_router(lesson.router, tags=["Lessons"])
 app.include_router(practice.router, prefix="/practice", tags=["Practice"])
 app.include_router(progress.router, prefix="/progress", tags=["Progress"])
 app.include_router(quiz.router, prefix="/quizzes", tags=["Quizzes"])
