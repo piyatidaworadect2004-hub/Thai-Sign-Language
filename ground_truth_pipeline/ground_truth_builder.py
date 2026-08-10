@@ -108,12 +108,12 @@ class LandmarkExtractor:
     def __init__(self, pose_model_path: str, hand_model_path: str):
         pose_options = mp_vision.PoseLandmarkerOptions(
             base_options=mp_python.BaseOptions(model_asset_path=pose_model_path),
-            running_mode=mp_vision.RunningMode.VIDEO,
+            running_mode=mp_vision.RunningMode.IMAGE,
             num_poses=1,
         )
         hand_options = mp_vision.HandLandmarkerOptions(
             base_options=mp_python.BaseOptions(model_asset_path=hand_model_path),
-            running_mode=mp_vision.RunningMode.VIDEO,
+            running_mode=mp_vision.RunningMode.IMAGE,
             num_hands=2,
         )
         self.pose_landmarker = mp_vision.PoseLandmarker.create_from_options(pose_options)
@@ -121,14 +121,14 @@ class LandmarkExtractor:
 
     def extract(self, frame_rgb: np.ndarray, timestamp_ms: int):
         """
-        Input : เฟรมภาพ RGB (H, W, 3), timestamp เป็น ms (ต้องเรียงเพิ่มขึ้นเรื่อยๆ)
+        Input : เฟรมภาพ RGB (H, W, 3), timestamp_ms ไม่ได้ใช้แล้ว (คงพารามิเตอร์ไว้เพื่อความเข้ากันได้กับโค้ดเดิม)
         Output: (pose_world, hand_left_world, hand_right_world)
                  แต่ละตัวเป็น np.ndarray หรือ None ถ้าตรวจไม่เจอ
         """
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
 
-        pose_result = self.pose_landmarker.detect_for_video(mp_image, timestamp_ms)
-        hand_result = self.hand_landmarker.detect_for_video(mp_image, timestamp_ms)
+        pose_result = self.pose_landmarker.detect(mp_image)
+        hand_result = self.hand_landmarker.detect(mp_image)
 
         # --- Pose WorldLandmarks ---
         pose_world = None
@@ -317,16 +317,29 @@ def build_ground_truth(label: str, frame_records: list) -> dict:
 def save_ground_truth(gt: dict, out_dir: str):
     """
     บันทึกเป็น 2 ไฟล์ต่อ 1 คำศัพท์:
-        {label}.npz   -> array ตัวเลขทั้งหมด (feature_matrix, raw_*) โหลดเร็ว ใช้จริงตอน inference
+        {label}.npz   -> feature_matrices (array ของ 1 ตัวอย่าง) + raw_* โหลดเร็ว ใช้จริงตอน inference
         {label}.json  -> metadata + joint_angles_sequence อ่านง่าย ใช้ debug
+
+    ใช้ key "feature_matrices" (พหูพจน์, array ของหลายตัวอย่างต่อคำ) แบบเดียวกับ
+    batch_build_ground_truth_from_raw.py เพื่อให้ engine.py (compare_to_word) อ่านไฟล์นี้ได้ตรงๆ
+    ถ้ารันสคริปต์นี้หลายรอบกับคำเดียวกัน ไฟล์ .npz เดิมจะถูกอ่านมารวมกับตัวอย่างใหม่ (ไม่ใช่เขียนทับ)
     """
     os.makedirs(out_dir, exist_ok=True)
     label = gt["label"]
-
     npz_path = os.path.join(out_dir, f"{label}.npz")
+
+    existing_matrices = []
+    if os.path.exists(npz_path):
+        old_data = np.load(npz_path, allow_pickle=True)
+        if "feature_matrices" in old_data:
+            existing_matrices = list(old_data["feature_matrices"])
+
+    feature_matrices = existing_matrices + [gt["feature_matrix"]]
+
     np.savez_compressed(
         npz_path,
-        feature_matrix=gt["feature_matrix"],
+        feature_matrices=np.array(feature_matrices, dtype=object),
+        num_samples=len(feature_matrices),
         raw_pose=gt["raw_pose_sequence"],
         raw_hand_left=gt["raw_hand_left_sequence"],
         raw_hand_right=gt["raw_hand_right_sequence"],
@@ -337,26 +350,31 @@ def save_ground_truth(gt: dict, out_dir: str):
         json.dump(
             {
                 "label": gt["label"],
-                "num_frames": gt["num_frames"],
+                "num_samples": len(feature_matrices),
+                "num_frames_last_sample": gt["num_frames"],
                 "feature_dim": gt["feature_dim"],
                 "joint_angles_sequence": gt["joint_angles_sequence"],
+                # ตัวเลข feature_matrices เต็มรูปแบบ (list ต่อ sample ต่อเฟรม ต่อมิติ) ของทุกตัวอย่างสะสม
+                # เก็บไว้เพื่อเปิดดู/ตรวจสอบด้วยตา หรือส่งไฟล์นี้ไปให้ระบบ/AI อื่นใช้ต่อได้โดยไม่ต้องพึ่ง numpy
+                # ตัวที่ backend ใช้เทียบท่าจริงยังคงเป็น .npz (โหลดเร็วกว่า) ไม่เกี่ยวกับส่วนนี้
+                "feature_matrices": [m.tolist() for m in feature_matrices],
             },
             f,
             ensure_ascii=False,
             indent=2,
         )
 
-    print(f"[saved] {npz_path}  ({gt['num_frames']} frames, dim={gt['feature_dim']})")
+    print(f"[saved] {npz_path}  ({len(feature_matrices)} samples, dim={gt['feature_dim']})")
     print(f"[saved] {json_path}")
 
 
 def load_ground_truth(label: str, gt_dir: str) -> dict:
-    """โหลด Ground Truth กลับมาใช้ตอน Inference (ใช้ feature_matrix เป็นหลัก)"""
+    """โหลด Ground Truth กลับมาใช้ตอน Inference (ใช้ feature_matrices เป็นหลัก)"""
     npz_path = os.path.join(gt_dir, f"{label}.npz")
-    data = np.load(npz_path)
+    data = np.load(npz_path, allow_pickle=True)
     return {
         "label": label,
-        "feature_matrix": data["feature_matrix"],       # (M, D) — ป้อนเข้า DTW ได้ทันที
+        "feature_matrices": data["feature_matrices"],   # array ของ (M, D) — ป้อนเข้า DTW ได้ทันที
         "raw_pose_sequence": data["raw_pose"],           # สำรองไว้ debug/re-compute
         "raw_hand_left_sequence": data["raw_hand_left"],
         "raw_hand_right_sequence": data["raw_hand_right"],

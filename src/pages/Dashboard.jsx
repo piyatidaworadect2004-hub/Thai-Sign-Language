@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 export default function Dashboard() {
     const [progressData, setProgressData] = useState([]);
     const [stats, setStats] = useState({ totalPracticed: 0, avgConfidence: 0 });
+    const [categoryOverview, setCategoryOverview] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
@@ -24,14 +25,24 @@ export default function Dashboard() {
 
                     // คำนวณสถิติเบื้องต้น
                     const total = data.length;
-                    const avgConf = total > 0 
-                        ? data.reduce((acc, curr) => acc + (curr.confidence || 0), 0) / total 
+                    const avgConf = total > 0
+                        ? data.reduce((acc, curr) => acc + (curr.confidence || 0), 0) / total
                         : 0;
 
                     setStats({
                         totalPracticed: total,
                         avgConfidence: (avgConf * 100).toFixed(1)
                     });
+                }
+
+                // ความคืบหน้าแยกตามหมวดหมู่ (% ฝึกไปกี่คำจากทั้งหมดในหมวดนั้น)
+                const overviewRes = await fetch("http://localhost:8000/progress/me/overview", {
+                    headers: {
+                        ...(token && { Authorization: `Bearer ${token}` })
+                    }
+                });
+                if (overviewRes.ok) {
+                    setCategoryOverview(await overviewRes.json());
                 }
             } catch (error) {
                 console.error("ไม่สามารถดึงข้อมูลความคืบหน้าได้:", error);
@@ -85,6 +96,34 @@ export default function Dashboard() {
                     <div className="bg-green-100 p-4 rounded-2xl text-3xl">🎯</div>
                 </div>
             </div>
+
+            {/* ความคืบหน้าแยกตามหมวดหมู่ */}
+            {categoryOverview.length > 0 && (
+                <div className="bg-white rounded-3xl shadow-md p-6 border-2 border-white mb-8">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">ความคืบหน้าแยกตามหมวดหมู่</h2>
+                    <div className="space-y-4">
+                        {categoryOverview.map((cat) => (
+                            <div key={cat.category_id}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="font-semibold text-gray-700">{cat.category_name}</span>
+                                    <span className="text-sm font-bold text-blue-600">
+                                        {cat.completion_percentage}%
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden mb-1">
+                                    <div
+                                        className="h-3 rounded-full bg-blue-500 transition-all"
+                                        style={{ width: `${Math.min(cat.completion_percentage, 100)}%` }}
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-400">
+                                    ฝึกไปแล้ว {cat.words_practiced} / {cat.total_words} คำ
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* ประวัติการฝึกซ้อมล่าสุด */}
             <div className="bg-white rounded-3xl shadow-md p-6 border-2 border-white">
