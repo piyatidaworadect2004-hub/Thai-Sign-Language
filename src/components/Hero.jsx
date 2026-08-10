@@ -27,18 +27,6 @@ export default function Hero() {
 
           </p>
 
-          <div className="mt-10 flex gap-5">
-
-            <button className="bg-blue-600 text-white px-8 py-4 rounded-2xl">
-              เริ่มเรียน
-            </button>
-
-            <button className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-2xl">
-              ฝึกกับ AI
-            </button>
-
-          </div>
-
         </div>
 
         <div className="flex justify-center">

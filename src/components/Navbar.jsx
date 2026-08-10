@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom'; // 🟢 เพิ่ม Link ถ้ารองรับ หรือใช้ a ตามโค้ดเดิม
+import { useNavigate } from 'react-router-dom';
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="flex items-center justify-between px-8 py-4 bg-white shadow-sm">
+    <nav className="sticky top-0 z-50 flex items-center justify-between px-8 py-4 bg-white shadow-sm">
       {/* ฝั่งซ้าย: ชื่อโปรเจกต์ */}
       <div 
         className="text-xl font-bold text-blue-600 cursor-pointer" 
@@ -40,7 +40,6 @@ export default function Navbar() {
       <div className="flex items-center space-x-6 font-medium text-gray-700">
         <a href="/home" className="hover:text-blue-600 transition">หน้าหลัก</a>
         <a href="/lessons" className="hover:text-blue-600 transition">บทเรียน</a>
-        <a href="/practice" className="hover:text-blue-600 transition">ฝึก AI</a>
         <a href="/quiz" className="hover:text-blue-600 transition">แบบทดสอบ</a>
 
         {/* 📊 เมนูกดไปหน้าแดชบอร์ดความคืบหน้า */}

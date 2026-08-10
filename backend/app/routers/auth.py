@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 from typing import List
 
 from app.database import get_db
-from app.models import User
+from app.models import User, LoginLog
 from app.schemas import UserOut, Token, UserCreate, UserLoginRequest
 from app.services.authen_service import (
     get_password_hash, verify_password, create_access_token,
@@ -85,6 +85,13 @@ def login_for_access_token(
         )
 
     access_token = create_access_token(data={"sub": user.username})
+
+    try:
+        db.add(LoginLog(user_id=user.id, email=user.email))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"⚠️ บันทึก login log ไม่สำเร็จ: {e}")
 
     return {
         "access_token": access_token,
