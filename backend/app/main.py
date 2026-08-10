@@ -53,35 +53,15 @@ app.include_router(progress.router, prefix="/progress", tags=["Progress"])
 app.include_router(quiz.router, prefix="/quizzes", tags=["Quizzes"])
 app.include_router(practice_compare.router, prefix="/practice-compare", tags=["Practice Compare"])
 
-# Instance MediaPipe Hands Detector
-mp_hands = mp.solutions.hands
-
 # 🟢 ตั้งค่าให้รองรับการตรวจจับสูงสุด 2 มือ
-hands_detector = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=2,            # 👈 รองรับสูงสุด 2 มือ
-    min_detection_confidence=0.3,
-    min_tracking_confidence=0.3
-)
-
-# 🟢 เปลี่ยนจาก difficulty -> level และลบ color ออก ให้ตรงกับ DB จริง (Supabase: category table)
-BASE_CATEGORIES = [
-    {"id": 1, "name": "คำทักทาย", "total_words": 5, "level": "ง่าย", "image": "👋"},
-    {"id": 2, "name": "ครอบครัว", "total_words": 5, "level": "ปานกลาง", "image": "👨‍👩‍👧"},
-    {"id": 3, "name": "อาหาร", "total_words": 5, "level": "ง่าย", "image": "🍜"}
-]
-
-words = [
-    {"id": 1, "category_id": 1, "word": "สวัสดี", "meaning": "Hello", "image": "👋"},
-    {"id": 2, "category_id": 1, "word": "ขอบคุณ", "meaning": "Thank you", "image": "🙏"},
-    {"id": 3, "category_id": 1, "word": "ลาก่อน", "meaning": "Goodbye", "image": "👋"},
-    {"id": 4, "category_id": 2, "word": "พ่อ", "meaning": "Father", "image": "👨"},
-    {"id": 5, "category_id": 2, "word": "แม่", "meaning": "Mother", "image": "👩"},
-    {"id": 6, "category_id": 2, "word": "ลูก", "meaning": "Child", "image": "👧"},
-    {"id": 7, "category_id": 3, "word": "ข้าว", "meaning": "Rice", "image": "🍚"},
-    {"id": 8, "category_id": 3, "word": "น้ำ", "meaning": "Water", "image": "💧"},
-    {"id": 9, "category_id": 3, "word": "อาหาร", "meaning": "Food", "image": "🍜"}
-]
+hands_detector = None
+if mp_hands is not None:
+    hands_detector = mp_hands.Hands(
+        static_image_mode=False,
+        max_num_hands=2,            # รองรับ 2 มือ
+        min_detection_confidence=0.3,
+        min_tracking_confidence=0.3
+    )
 
 def get_optional_current_user(
     authorization: Optional[str] = Header(None), 

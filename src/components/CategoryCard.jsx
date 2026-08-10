@@ -1,9 +1,9 @@
 import { useNavigate } from "react-router-dom";
 
 const levelBorderColor = {
-  ง่าย: "#4ade80",     // เขียว
-  ปานกลาง: "#facc15",  // เหลือง
-  ยาก: "#f87171",      // แดง
+  ง่าย: "#4ade80",    
+  ปานกลาง: "#facc15",  
+  ยาก: "#f87171"     
 };
 
 export default function CategoryCard({
