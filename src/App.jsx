@@ -89,12 +89,6 @@ export default function App() {
           }
         />
 
-        {/* ถ้าพิมพ์ URL ผิด ให้กลับ Login */}
-        <Route
-          path="*"
-          element={<Navigate to="/login" replace />}
-        />
-
         {/* หน้าแดชบอร์ดสรุปผล */}
         <Route
           path="/dashboard"
@@ -113,6 +107,12 @@ export default function App() {
               <LessonList />
             </ProtectedRoute>
           }
+        />
+
+        {/* ถ้าพิมพ์ URL ผิด (ไม่ตรงกับ route ไหนข้างบนเลย) ให้กลับ Login */}
+        <Route
+          path="*"
+          element={<Navigate to="/login" replace />}
         />
 
       </Routes>

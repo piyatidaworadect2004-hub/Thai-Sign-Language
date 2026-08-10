@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState([]); // ★ เพิ่ม: ใช้ทำ dropdown เลือกหมวดหมู่
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
+  const [selectedUserLabel, setSelectedUserLabel] = useState('');
   const [loginLogs, setLoginLogs] = useState([]);
 
   // ★ เพิ่ม: state สำหรับฟอร์มเพิ่มบทเรียน (เดิมมีแค่ newLessonTitle อย่างเดียว)
@@ -174,7 +175,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleViewUserProgress = async (userId) => {
+  const handleViewUserProgress = async (userId, userLabel) => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`http://127.0.0.1:8000/progress/user/${userId}/overview`, {
@@ -183,6 +184,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setReports(data);
+        setSelectedUserLabel(userLabel || `User #${userId}`);
         setActiveTab('reports');
       } else {
         alert('ไม่สามารถดึงข้อมูลความคืบหน้าของ User นี้ได้');
@@ -444,7 +446,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
                           <button
-                            onClick={() => handleViewUserProgress(u.id)}
+                            onClick={() => handleViewUserProgress(u.id, u.email || u.username)}
                             className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg hover:bg-purple-200 transition text-xs font-medium"
                           >
                             ดูความคืบหน้า
@@ -460,14 +462,45 @@ export default function AdminDashboard() {
 
           {activeTab === 'reports' && (
             <div>
-              <h2 className="text-xl font-bold text-gray-800 mb-4">📊 รายงานผลการฝึกฝนและความคืบหน้า</h2>
-              <p className="text-gray-500 text-sm mb-4">แสดงข้อมูลภาพรวมคะแนนและประวัติการฝึกท่าภาษามือของผู้ใช้ที่เลือก</p>
+              <h2 className="text-xl font-bold text-gray-800 mb-1">📊 รายงานผลการฝึกฝนและความคืบหน้า</h2>
+              <p className="text-gray-500 text-sm mb-4">
+                {selectedUserLabel ? (
+                  <>ความคืบหน้าของ <span className="font-semibold text-gray-700">{selectedUserLabel}</span> แยกตามหมวดหมู่</>
+                ) : (
+                  'แสดงข้อมูลภาพรวมคะแนนและประวัติการฝึกท่าภาษามือของผู้ใช้ที่เลือก'
+                )}
+              </p>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <pre className="text-xs text-gray-700 overflow-x-auto">
-                  {reports.length > 0 ? JSON.stringify(reports, null, 2) : 'ยังไม่ได้เลือกผู้ใช้ หรือไม่มีข้อมูลความคืบหน้า'}
-                </pre>
-              </div>
+              {reports.length === 0 ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-sm text-gray-500">
+                  ยังไม่ได้เลือกผู้ใช้ หรือไม่มีข้อมูลความคืบหน้า
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reports.map((r) => (
+                    <div key={r.category_id} className="border border-gray-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-semibold text-gray-800">{r.category_name}</h3>
+                        <span className="text-sm font-bold text-blue-600">
+                          {r.completion_percentage}%
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden mb-2">
+                        <div
+                          className="h-3 rounded-full bg-blue-500 transition-all"
+                          style={{ width: `${Math.min(r.completion_percentage, 100)}%` }}
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
+                        <span>ฝึกไปแล้ว {r.words_practiced} / {r.total_words} คำ</span>
+                        <span>ความใกล้เคียงเฉลี่ย: {r.correctness_percentage}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
