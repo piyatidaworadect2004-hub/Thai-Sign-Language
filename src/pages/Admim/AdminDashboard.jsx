@@ -99,6 +99,10 @@ export default function AdminDashboard() {
       alert('กรุณาเลือกหมวดหมู่');
       return;
     }
+    if (!newLessonVideoUrl.trim()) {
+      alert('กรุณาใส่ Video URL ตัวอย่าง (ใช้สร้าง Ground Truth ให้คำนี้ต่อได้เลย)');
+      return;
+    }
 
     setAddingLesson(true);
     try {
@@ -418,7 +422,8 @@ export default function AdminDashboard() {
 
                 <input
                   type="text"
-                  placeholder="Video URL (ไม่บังคับ)"
+                  required
+                  placeholder="Video URL * (บังคับใส่ — ใช้สร้าง Ground Truth ให้คำนี้)"
                   value={newLessonVideoUrl}
                   onChange={(e) => setNewLessonVideoUrl(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
