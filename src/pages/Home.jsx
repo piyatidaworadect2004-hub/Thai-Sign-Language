@@ -94,6 +94,8 @@ export default function Home() {
         <div className="grid lg:grid-cols-3 gap-8">
           {isLoading ? (
             <p className="text-gray-500 font-medium animate-pulse">กำลังโหลดคำแนะนำ...</p>
+          ) : errorMsg ? (
+            <p className="text-red-500 font-medium">เกิดข้อผิดพลาด: {errorMsg}</p>
           ) : categories.length > 0 ? (
             categories.slice(0, 3).map((category) => (
               <RecommendationCard

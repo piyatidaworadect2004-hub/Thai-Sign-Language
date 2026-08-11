@@ -46,13 +46,6 @@ class Lesson(Base):
 
     category = relationship("Category", back_populates="lessons")
 
-class Quiz(Base):
-    __tablename__ = "quizzes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-
 class UserProgress(Base):
     __tablename__ = "user_progress"
 

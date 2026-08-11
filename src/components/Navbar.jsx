@@ -40,7 +40,6 @@ export default function Navbar() {
       <div className="flex items-center space-x-6 font-medium text-gray-700">
         <a href="/home" className="hover:text-blue-600 transition">หน้าหลัก</a>
         <a href="/lessons" className="hover:text-blue-600 transition">บทเรียน</a>
-        <a href="/quiz" className="hover:text-blue-600 transition">แบบทดสอบ</a>
 
         {/* 📊 เมนูกดไปหน้าแดชบอร์ดความคืบหน้า */}
         <a 

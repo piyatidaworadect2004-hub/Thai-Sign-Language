@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 # Import Database, Models และ Routers ทั้งหมด
 from app.database import engine, Base, get_db
-from app.routers import auth, category, lesson, progress, quiz, practice_compare
+from app.routers import auth, category, lesson, progress, practice_compare
 from app.routers.auth import get_current_user, require_admin
 from app.models import User, PracticeLog, LoginLog
 from app.sign_engine.engine import compute_features, compare_to_word
@@ -53,7 +53,6 @@ app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(category.router, prefix="/categories", tags=["Categories"])
 app.include_router(lesson.router, tags=["Lessons"])
 app.include_router(progress.router, prefix="/progress", tags=["Progress"])
-app.include_router(quiz.router, prefix="/quizzes", tags=["Quizzes"])
 app.include_router(practice_compare.router, prefix="/practice-compare", tags=["Practice Compare"])
 
 # Instance MediaPipe Hands Detector

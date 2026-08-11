@@ -67,17 +67,6 @@ class CategoryOut(CategoryBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-
-# --- Quiz Schemas ---
-class QuizBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-
-class QuizOut(QuizBase):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
 # --- UserProgress Schemas ---
 class UserProgressBase(BaseModel):
     category_id: int
