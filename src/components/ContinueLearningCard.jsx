@@ -10,7 +10,7 @@ export default function ContinueLearningCard({
   const navigate = useNavigate();
 
   return (
-    <div className="bg-white rounded-3xl shadow-lg p-6 max-w-sm hover:shadow-xl duration-300">
+    <div className="bg-white rounded-3xl shadow-lg p-6 w-80 shrink-0 hover:shadow-xl duration-300">
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-2xl bg-sky-100 flex items-center justify-center text-2xl shrink-0">
           {image || "🤟"}

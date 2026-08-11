@@ -54,6 +54,18 @@ export default function Dashboard() {
         fetchProgress();
     }, []);
 
+    // จัดกลุ่มประวัติตามหมวดหมู่ — คงลำดับตาม created_at desc เดิมไว้ (กลุ่มที่ฝึกล่าสุดขึ้นก่อน)
+    const groupedHistory = progressData.reduce((groups, item) => {
+        const key = item.category_name || "ไม่ทราบหมวดหมู่";
+        let group = groups.find((g) => g.category_name === key);
+        if (!group) {
+            group = { category_name: key, items: [] };
+            groups.push(group);
+        }
+        group.items.push(item);
+        return groups;
+    }, []);
+
     if (loading) {
         return (
             <div className="min-h-screen bg-sky-100 flex items-center justify-center">
@@ -134,33 +146,44 @@ export default function Dashboard() {
                         <p>ยังไม่มีประวัติการฝึกซ้อม เริ่มต้นฝึกคำแรกกันเลย!</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-gray-100 text-gray-400 text-sm">
-                                    <th className="py-3 px-4">บทเรียน / คำศัพท์</th>
-                                    <th className="py-3 px-4">ความมั่นใจ</th>
-                                    <th className="py-3 px-4">เวลาที่ฝึก</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {progressData.map((item, index) => (
-                                    <tr key={index} className="border-b border-gray-50 hover:bg-sky-50 transition">
-                                        <td className="py-4 px-4 font-bold text-gray-800">
-                                            {item.lesson?.word || `บทเรียนที่ ${item.lesson_id}`}
-                                        </td>
-                                        <td className="py-4 px-4">
-                                            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
-                                                {(item.confidence * 100).toFixed(1)}%
-                                            </span>
-                                        </td>
-                                        <td className="py-4 px-4 text-gray-500 text-sm">
-                                            {new Date(item.created_at || Date.now()).toLocaleString("th-TH")}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="space-y-6">
+                        {groupedHistory.map((group) => (
+                            <div key={group.category_name}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <h3 className="font-bold text-gray-700">{group.category_name}</h3>
+                                    <span className="text-xs text-gray-400">({group.items.length} รายการ)</span>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-gray-100 text-gray-400 text-sm">
+                                                <th className="py-3 px-4">บทเรียน / คำศัพท์</th>
+                                                <th className="py-3 px-4">ความมั่นใจ</th>
+                                                <th className="py-3 px-4">เวลาที่ฝึก</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {group.items.map((item, index) => (
+                                                <tr key={index} className="border-b border-gray-50 hover:bg-sky-50 transition">
+                                                    <td className="py-4 px-4 font-bold text-gray-800">
+                                                        {item.lesson?.word || `บทเรียนที่ ${item.lesson_id}`}
+                                                    </td>
+                                                    <td className="py-4 px-4">
+                                                        <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
+                                                            {(item.confidence * 100).toFixed(1)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-4 text-gray-500 text-sm">
+                                                        {new Date(item.created_at || Date.now()).toLocaleString("th-TH")}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
