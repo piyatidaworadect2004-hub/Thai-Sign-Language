@@ -20,10 +20,12 @@ export default function AdminDashboard() {
   const [newLessonDescription, setNewLessonDescription] = useState('');
   const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
   const [addingLesson, setAddingLesson] = useState(false);
+  const [uploadingNewVideo, setUploadingNewVideo] = useState(false);
 
   // ★ เพิ่ม: แก้ไข video_url ของคำที่มีอยู่แล้ว (แยกจากฟอร์มเพิ่มคำใหม่ด้านบน)
   const [editingVideoId, setEditingVideoId] = useState(null);
   const [editingVideoUrl, setEditingVideoUrl] = useState('');
+  const [uploadingEditVideoId, setUploadingEditVideoId] = useState(null);
 
   // ★ เพิ่ม: สร้าง Ground Truth อัตโนมัติจากวิดีโอตัวอย่าง (video_url) ของคำนั้น
   const [buildingGtId, setBuildingGtId] = useState(null);
@@ -164,6 +166,57 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error toggling is_active:', error);
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
+  };
+
+  // ★ เพิ่ม: อัปโหลดไฟล์วิดีโอจากเครื่องแทนการวางลิงก์ — คืนค่า URL ที่ backend เก็บไว้ให้แล้ว
+  const uploadVideoFile = async (file) => {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('http://127.0.0.1:8000/lessons/upload-video', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'อัปโหลดวิดีโอไม่สำเร็จ');
+    }
+    return data.video_url;
+  };
+
+  const handleNewVideoFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingNewVideo(true);
+    try {
+      const url = await uploadVideoFile(file);
+      setNewLessonVideoUrl(url);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setUploadingNewVideo(false);
+      e.target.value = ''; // เผื่อเลือกไฟล์เดิมซ้ำได้อีกครั้ง
+    }
+  };
+
+  const handleEditVideoFileChange = async (e, lessonId) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingEditVideoId(lessonId);
+    try {
+      const url = await uploadVideoFile(file);
+      setEditingVideoUrl(url);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setUploadingEditVideoId(null);
+      e.target.value = '';
     }
   };
 
@@ -420,18 +473,30 @@ export default function AdminDashboard() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
-                <input
-                  type="text"
-                  required
-                  placeholder="Video URL * (บังคับใส่ — ใช้สร้าง Ground Truth ให้คำนี้)"
-                  value={newLessonVideoUrl}
-                  onChange={(e) => setNewLessonVideoUrl(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="flex flex-col md:flex-row gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Video URL * (บังคับใส่ — วางลิงก์ หรืออัปโหลดไฟล์ทางขวา)"
+                    value={newLessonVideoUrl}
+                    onChange={(e) => setNewLessonVideoUrl(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label className="shrink-0 flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 cursor-pointer hover:bg-gray-50 transition">
+                    {uploadingNewVideo ? '⏳ กำลังอัปโหลด...' : '📁 อัปโหลดไฟล์จากเครื่อง'}
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleNewVideoFileChange}
+                      disabled={uploadingNewVideo}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
 
                 <button
                   onClick={handleAddLesson}
-                  disabled={addingLesson}
+                  disabled={addingLesson || uploadingNewVideo}
                   className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition disabled:bg-gray-400"
                 >
                   {addingLesson ? 'กำลังเพิ่ม...' : '+ เพิ่มคำศัพท์'}
@@ -464,15 +529,25 @@ export default function AdminDashboard() {
                         {/* ★ เพิ่มใหม่: แก้ไข video_url ของคำที่มีอยู่แล้ว */}
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {editingVideoId === lesson.id ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <input
                                 type="text"
                                 autoFocus
                                 value={editingVideoUrl}
                                 onChange={(e) => setEditingVideoUrl(e.target.value)}
                                 placeholder="วาง Video URL ที่นี่"
-                                className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
+                              <label className="text-xs text-blue-500 hover:text-blue-700 underline cursor-pointer">
+                                {uploadingEditVideoId === lesson.id ? '⏳ กำลังอัปโหลด...' : '📁 อัปโหลดไฟล์'}
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  onChange={(e) => handleEditVideoFileChange(e, lesson.id)}
+                                  disabled={uploadingEditVideoId === lesson.id}
+                                  className="hidden"
+                                />
+                              </label>
                               <button
                                 onClick={() => saveVideoUrl(lesson.id)}
                                 className="text-green-600 hover:text-green-800 text-xs font-semibold"

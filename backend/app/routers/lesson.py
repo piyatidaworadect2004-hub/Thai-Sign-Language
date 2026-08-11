@@ -1,13 +1,48 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import Lesson
+from app.models import Lesson, User
 from app.schemas import LessonBase, LessonOut
+from app.routers.auth import require_admin
 
 router = APIRouter(prefix="/lessons", tags=["Lessons"])
+
+# ★ เพิ่มใหม่: อัปโหลดวิดีโอตัวอย่างจากเครื่อง แทนการวางลิงก์ตรงๆ
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploaded_videos")
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"}
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
+
+
+@router.post("/upload-video")
+async def upload_lesson_video(
+    file: UploadFile = File(...),
+    current_admin: User = Depends(require_admin),
+):
+    if file.content_type not in ALLOWED_VIDEO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="รองรับเฉพาะไฟล์วิดีโอ (mp4, webm, mov, avi)",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="ไฟล์ใหญ่เกินไป (จำกัดไม่เกิน 100MB)")
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    ext = os.path.splitext(file.filename or "")[1] or ".mp4"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
+        f.write(content)
+
+    # ★ URL เต็มไปเลย (ไม่ใช่ path สัมพัทธ์) เพราะไฟล์นี้ถูก serve จาก backend (:8000)
+    # ไม่ใช่ frontend (:5173) — video_url ที่เก็บใน DB ต้องเปิดได้ตรงๆ ไม่ว่าจะมาจากหน้าไหน
+    return {"video_url": f"http://127.0.0.1:8000/uploaded-videos/{filename}"}
 
 @router.get("/", response_model=List[LessonOut])
 def get_lessons(db: Session = Depends(get_db)):
