@@ -41,13 +41,15 @@ export default function Navbar() {
         <a href="/home" className="hover:text-blue-600 transition">หน้าหลัก</a>
         <a href="/lessons" className="hover:text-blue-600 transition">บทเรียน</a>
 
-        {/* 📊 เมนูกดไปหน้าแดชบอร์ดความคืบหน้า */}
-        <a 
-          href="/dashboard" 
-          className="text-blue-600 font-bold hover:text-blue-800 transition bg-blue-50 px-3 py-1 rounded-full text-sm border border-blue-200"
-        >
-          📊 แดชบอร์ด
-        </a>
+        {/* 📊 เมนูกดไปหน้าแดชบอร์ดความคืบหน้า — โชว์เฉพาะ user ทั่วไป แอดมินมีรายงานผลของตัวเองอยู่แล้วใน "จัดการระบบ" */}
+        {!isAdmin && (
+          <a
+            href="/dashboard"
+            className="text-blue-600 font-bold hover:text-blue-800 transition bg-blue-50 px-3 py-1 rounded-full text-sm border border-blue-200"
+          >
+            📊 แดชบอร์ด
+          </a>
+        )}
 
         {/* ⚙️ ปุ่มเมนูแอดมิน (แสดงเฉพาะแอดมิน) */}
         {isAdmin && (

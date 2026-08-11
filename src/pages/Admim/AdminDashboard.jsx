@@ -605,30 +605,114 @@ export default function AdminDashboard() {
                   ยังไม่ได้เลือกผู้ใช้ หรือไม่มีข้อมูลความคืบหน้า
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {reports.map((r) => (
-                    <div key={r.category_id} className="border border-gray-200 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-gray-800">{r.category_name}</h3>
-                        <span className="text-sm font-bold text-blue-600">
-                          {r.completion_percentage}%
-                        </span>
-                      </div>
+                <>
+                  {/* legend — 2 series ต้องมี legend เสมอ */}
+                  <div className="flex items-center gap-5 text-xs text-gray-500 mb-3">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#2a78d6' }} />
+                      ความคืบหน้า (% คำที่เคยฝึก)
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#eb6834' }} />
+                      ความแม่นยำเฉลี่ย (%)
+                    </span>
+                  </div>
 
-                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden mb-2">
-                        <div
-                          className="h-3 rounded-full bg-blue-500 transition-all"
-                          style={{ width: `${Math.min(r.completion_percentage, 100)}%` }}
-                        />
-                      </div>
+                  {/* กราฟแท่งเทียบ 2 ตัวชี้วัดต่อหมวดหมู่ */}
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl p-4 mb-4">
+                    <svg
+                      viewBox={`0 0 560 ${28 + reports.length * 56 + 8}`}
+                      role="img"
+                      aria-label={`กราฟความคืบหน้าและความแม่นยำเฉลี่ยของ ${selectedUserLabel || 'ผู้ใช้'} แยกตามหมวดหมู่`}
+                      className="w-full"
+                      style={{ minWidth: 480 }}
+                    >
+                      {/* gridlines + tick labels (0/25/50/75/100%) */}
+                      {[0, 25, 50, 75, 100].map((pct) => {
+                        const x = 180 + (pct / 100) * 340;
+                        const bottomY = 28 + reports.length * 56;
+                        return (
+                          <g key={pct}>
+                            <line x1={x} y1={20} x2={x} y2={bottomY} stroke="#e5e7eb" strokeWidth="1" />
+                            <text x={x} y={14} textAnchor="middle" fontSize="10" fill="#9ca3af">{pct}%</text>
+                          </g>
+                        );
+                      })}
 
-                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
-                        <span>ฝึกไปแล้ว {r.words_practiced} / {r.total_words} คำ</span>
-                        <span>ความใกล้เคียงเฉลี่ย: {r.correctness_percentage}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      {reports.map((r, i) => {
+                        const rowY = 28 + i * 56;
+                        const groupCenter = rowY + 28;
+                        const completion = Math.min(r.completion_percentage, 100);
+                        const correctness = Math.min(r.correctness_percentage, 100);
+                        const plotW = 340;
+                        const leftX = 180;
+
+                        const roundedBar = (value, y) => {
+                          const w = (value / 100) * plotW;
+                          const rr = Math.min(4, w);
+                          if (w <= 0) return '';
+                          return `M${leftX},${y} h${w - rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${14 - 2 * rr} a${rr},${rr} 0 0 1 ${-rr},${rr} h${-(w - rr)} Z`;
+                        };
+
+                        const bar1Y = groupCenter - 2 - 14;
+                        const bar2Y = groupCenter + 2;
+
+                        return (
+                          <g key={r.category_id}>
+                            <title>
+                              {r.category_name}: ความคืบหน้า {completion}%, ความแม่นยำเฉลี่ย {correctness}%
+                            </title>
+
+                            <text
+                              x={leftX - 10}
+                              y={groupCenter}
+                              textAnchor="end"
+                              dominantBaseline="middle"
+                              fontSize="12"
+                              fill="#374151"
+                            >
+                              {r.category_name}
+                            </text>
+
+                            <path d={roundedBar(completion, bar1Y)} fill="#2a78d6" />
+                            <text x={leftX + (completion / 100) * plotW + 6} y={bar1Y + 7} dominantBaseline="middle" fontSize="10" fill="#52514e">
+                              {completion}%
+                            </text>
+
+                            <path d={roundedBar(correctness, bar2Y)} fill="#eb6834" />
+                            <text x={leftX + (correctness / 100) * plotW + 6} y={bar2Y + 7} dominantBaseline="middle" fontSize="10" fill="#52514e">
+                              {correctness}%
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+
+                  {/* table view — ตัวเลขจริงครบทุกหมวด (accessibility: ไม่ต้องพึ่งกราฟอย่างเดียว) */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                          <th className="py-2 pr-4 font-medium">หมวดหมู่</th>
+                          <th className="py-2 pr-4 font-medium">ฝึกไปแล้ว</th>
+                          <th className="py-2 pr-4 font-medium">ความคืบหน้า</th>
+                          <th className="py-2 font-medium">ความแม่นยำเฉลี่ย</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reports.map((r) => (
+                          <tr key={r.category_id} className="border-b border-gray-50">
+                            <td className="py-2 pr-4 text-gray-700">{r.category_name}</td>
+                            <td className="py-2 pr-4 text-gray-500">{r.words_practiced} / {r.total_words} คำ</td>
+                            <td className="py-2 pr-4 text-gray-500">{r.completion_percentage}%</td>
+                            <td className="py-2 text-gray-500">{r.correctness_percentage}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           )}
