@@ -34,7 +34,6 @@ export default function Practice() {
 
     const [prediction, setPrediction] = useState("");
     const [confidence, setConfidence] = useState(0);
-    const [debug, setDebug] = useState("");
 
     const [isRecording, setIsRecording] = useState(false);
     const [isComparing, setIsComparing] = useState(false);
@@ -144,10 +143,7 @@ export default function Practice() {
     }, [targetWord]);
 
     async function predictSign(frames) {
-        if (!frames.length) {
-            if (isMounted.current) setDebug(`buffer ว่าง (${frames.length} เฟรม) — ยังไม่ส่ง /predict`);
-            return;
-        }
+        if (!frames.length) return;
         if (!targetWord) return;
 
         try {
@@ -168,7 +164,6 @@ export default function Practice() {
             if (!response.ok) {
                 const errText = await response.text();
                 console.error("predict API error:", response.status, errText);
-                if (isMounted.current) setDebug(`/predict error ${response.status}: ${errText.slice(0, 100)}`);
                 return;
             }
 
@@ -178,7 +173,6 @@ export default function Practice() {
                 if (isMounted.current) {
                     setPrediction("");
                     setConfidence(0);
-                    setDebug(`ยังไม่มี ground truth สำหรับคำ "${targetWord}"`);
                 }
                 return;
             }
@@ -186,11 +180,9 @@ export default function Practice() {
             if (isMounted.current) {
                 setPrediction(result.word || "");
                 setConfidence(result.confidence || 0);
-                setDebug(`buffer ${frames.length} เฟรม → best_score ${result.best_score}`);
             }
         } catch (error) {
             console.error("predict API network error:", error);
-            if (isMounted.current) setDebug(`เรียก /predict ไม่สำเร็จ: ${error.message}`);
         }
     }
 
@@ -440,7 +432,6 @@ export default function Practice() {
                                     setHandDetected(false);
                                     setPrediction("");
                                     setConfidence(0);
-                                    setDebug("");
                                 }
                             }
                         }
@@ -627,13 +618,33 @@ export default function Practice() {
                             )}
                         </div>
 
-                        <div className="mt-2 space-y-1">
-                            {cameraOn && <p className="text-green-600 text-sm font-bold">กล้องทำงาน</p>}
-                            {handDetected && <p className="text-blue-600 text-sm font-bold">ตรวจพบมือ</p>}
+                        {/* min-height กันกล่องกระตุก — จองที่ไว้สำหรับสูงสุด 2 บรรทัดที่ขึ้น/หายสลับกันตอนตรวจจับมือ */}
+                        <div className="mt-2 space-y-1 min-h-[3rem]">
+                            {cameraOn && <p className="fade-in text-green-600 text-sm font-bold">กล้องทำงาน</p>}
+                            {handDetected && <p className="fade-in text-blue-600 text-sm font-bold">ตรวจพบมือ</p>}
                             {!cameraOn && !practiceStarted && (
-                                <p className="text-gray-400 text-sm">กล้องไม่ทำงาน</p>
+                                <p className="fade-in text-gray-400 text-sm">กล้องไม่ทำงาน</p>
                             )}
-                            {debug && <p className="text-purple-600 text-sm font-bold">{debug}</p>}
+                        </div>
+
+                        {/* แถบความใกล้เคียงของท่าแบบ real-time — เรนเดอร์ตลอด (ไม่ผูกกับ handDetected)
+                            กันกล่องกระตุกตอนมือหลุดจากเฟรมแล้วทั้งบล็อกหาย/โผล่ ค่าจะกลับไป 0% เองเพราะ
+                            confidence ถูก reset เป็น 0 อยู่แล้วตอนตรวจไม่พบมือ */}
+                        <div className="mt-2">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm text-gray-600">ความใกล้เคียงของท่า</span>
+                                <span className="text-sm font-bold text-blue-600">
+                                    {Math.round(confidence * 100)}%
+                                </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                <div
+                                    className={`h-3 rounded-full transition-all duration-700 ease-out ${
+                                        prediction ? "bg-green-500" : "bg-orange-400"
+                                    }`}
+                                    style={{ width: `${Math.round(confidence * 100)}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -653,27 +664,6 @@ export default function Practice() {
                         <h2 className="text-lg font-bold text-gray-800 mb-1">
                             ผลการตรวจสอบท่า (เทียบกับ Ground Truth)
                         </h2>
-
-                        {/* โชว์แถบ real-time ทุกครั้งที่ตรวจพบมือ แม้จะมีผลสรุปรอบก่อนค้างอยู่ก็ตาม
-                            เพื่อให้เห็นความคืบหน้าระหว่างลองฝึกท่าใหม่ก่อนกดบันทึกรอบถัดไป */}
-                        {handDetected && (
-                            <div className="mt-3 mb-4">
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm text-gray-600">ความใกล้เคียงของท่า</span>
-                                    <span className="text-sm font-bold text-blue-600">
-                                        {Math.round(confidence * 100)}%
-                                    </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                                    <div
-                                        className={`h-3 rounded-full transition-all duration-700 ease-out ${
-                                            prediction ? "bg-green-500" : "bg-orange-400"
-                                        }`}
-                                        style={{ width: `${Math.round(confidence * 100)}%` }}
-                                    />
-                                </div>
-                            </div>
-                        )}
 
                         {compareError && (
                             <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 mb-3">

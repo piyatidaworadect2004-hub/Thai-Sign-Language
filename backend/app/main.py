@@ -10,13 +10,14 @@ import mediapipe as mp
 from fastapi import FastAPI, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import cast, Integer
 from pydantic import BaseModel
 
 # Import Database, Models และ Routers ทั้งหมด
 from app.database import engine, Base, get_db
 from app.routers import auth, category, lesson, progress, practice_compare
 from app.routers.auth import get_current_user, require_admin
-from app.models import User, PracticeLog, LoginLog
+from app.models import User, PracticeLog, LoginLog, Lesson, Category
 from app.sign_engine.engine import compute_features, compare_to_word
 Base.metadata.create_all(bind=engine)
 
@@ -212,20 +213,25 @@ def get_practice_history(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    logs = db.query(PracticeLog)\
-             .filter(PracticeLog.user_id == current_user.id)\
-             .order_by(PracticeLog.created_at.desc())\
-             .limit(50)\
-             .all()
-             
+    rows = (
+        db.query(PracticeLog, Category.name.label("category_name"))
+        .outerjoin(Lesson, cast(PracticeLog.lesson_id, Integer) == Lesson.id)
+        .outerjoin(Category, Lesson.category_id == Category.id)
+        .filter(PracticeLog.user_id == current_user.id)
+        .order_by(PracticeLog.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
     formatted_logs = []
-    for log in logs:
+    for log, category_name in rows:
         formatted_logs.append({
             "id": log.id,
             "lesson_id": log.lesson_id,
             "confidence": log.confidence or (log.correctness_percentage / 100 if log.correctness_percentage else 0.9),
             "is_correct": bool(log.is_correct),
             "created_at": log.created_at.isoformat() if log.created_at else datetime.utcnow().isoformat(),
+            "category_name": category_name,
             "lesson": {
                 "word": log.target_word or f"บทเรียนที่ {log.lesson_id}"
             }
