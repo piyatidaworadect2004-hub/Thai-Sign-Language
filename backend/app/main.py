@@ -4,11 +4,14 @@ import random
 from typing import List, Optional
 from datetime import datetime
 
+import os
+
 import cv2
 import numpy as np
 import mediapipe as mp
 from fastapi import FastAPI, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import cast, Integer
 from pydantic import BaseModel
@@ -48,6 +51,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 🟢 เปิดให้เข้าถึงวิดีโอตัวอย่างที่แอดมินอัปโหลดจากเครื่อง (backend/app/uploaded_videos/)
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploaded_videos")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploaded-videos", StaticFiles(directory=UPLOAD_DIR), name="uploaded-videos")
 
 # 🟢 ลงทะเบียน Routers ครบทุกตัว
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
