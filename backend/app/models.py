@@ -46,13 +46,6 @@ class Lesson(Base):
 
     category = relationship("Category", back_populates="lessons")
 
-class Quiz(Base):
-    __tablename__ = "quizzes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-
 class UserProgress(Base):
     __tablename__ = "user_progress"
 
@@ -67,6 +60,16 @@ class UserProgress(Base):
 
     user = relationship("User", back_populates="progress")
     category = relationship("Category", back_populates="progress")
+
+class LoginLog(Base):
+    __tablename__ = "login_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    email = Column(String, nullable=False)
+    login_time = Column(DateTime, server_default=func.now())
+
+    user = relationship("User")
 
 class PracticeLog(Base):
     __tablename__ = "practice_logs"

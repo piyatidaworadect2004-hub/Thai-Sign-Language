@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, cast, Integer, Numeric, and_
 
 from app.database import get_db
-from app.models import PracticeLog, Category, Lesson
+from app.models import PracticeLog, Category, Lesson, User
+from app.routers.auth import get_current_user
 
 router = APIRouter()
 
 
-@router.get("/user/{user_id}/overview")
-def get_progress_overview(user_id: int, db: Session = Depends(get_db)):
+def _build_overview(user_id: int, db: Session):
     results = (
         db.query(
             Category.id.label("category_id"),
@@ -49,6 +49,30 @@ def get_progress_overview(user_id: int, db: Session = Depends(get_db)):
         })
 
     return overview
+
+
+@router.get("/me/overview")
+def get_my_progress_overview(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """ให้ user ทั่วไปดูความคืบหน้าของตัวเองได้ ไม่ต้องรู้ user_id ตัวเอง"""
+    return _build_overview(current_user.id, db)
+
+
+@router.get("/user/{user_id}/overview")
+def get_progress_overview(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """ดูของ user คนอื่นได้เฉพาะ admin เท่านั้น ดูของตัวเองได้เสมอ"""
+    if current_user.id != user_id and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="คุณไม่มีสิทธิ์ดูความคืบหน้าของผู้ใช้คนอื่น",
+        )
+    return _build_overview(user_id, db)
 
 
 @router.get("/user/{user_id}/detail")

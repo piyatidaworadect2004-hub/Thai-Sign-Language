@@ -14,11 +14,18 @@ from pydantic import BaseModel
 
 # Import Database, Models และ Routers ทั้งหมด
 from app.database import engine, Base, get_db
-from app.routers import auth, category, lesson, practice, progress, quiz, practice_compare
-from app.routers.auth import get_current_user
-from app.models import User, Category, UserProgress, PracticeLog
+from app.routers import auth, category, lesson, progress, practice_compare
+from app.routers.auth import get_current_user, require_admin
+from app.models import User, PracticeLog, LoginLog
+from app.sign_engine.engine import compute_features, compare_to_word
 Base.metadata.create_all(bind=engine)
 
+<<<<<<< HEAD
+=======
+# ==========================================
+# 🟢 ตรวจสอบว่า mp.solutions.hands ใช้งานได้ไหม (บาง build ของ mediapipe ไม่มี solutions API)
+# ==========================================
+>>>>>>> 6910925ecf9413850c413851fd0c782f3b258935
 mp_hands = None
 if hasattr(mp, "solutions") and hasattr(mp.solutions, "hands"):
     mp_hands = mp.solutions.hands
@@ -48,12 +55,11 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(category.router, prefix="/categories", tags=["Categories"])
 app.include_router(lesson.router, tags=["Lessons"])
-app.include_router(practice.router, prefix="/practice", tags=["Practice"])
 app.include_router(progress.router, prefix="/progress", tags=["Progress"])
-app.include_router(quiz.router, prefix="/quizzes", tags=["Quizzes"])
 app.include_router(practice_compare.router, prefix="/practice-compare", tags=["Practice Compare"])
 
 # 🟢 ตั้งค่าให้รองรับการตรวจจับสูงสุด 2 มือ
+<<<<<<< HEAD
 hands_detector = None
 if mp_hands is not None:
     hands_detector = mp_hands.Hands(
@@ -62,6 +68,14 @@ if mp_hands is not None:
         min_detection_confidence=0.3,
         min_tracking_confidence=0.3
     )
+=======
+hands_detector = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=2,            # 👈 รองรับสูงสุด 2 มือ
+    min_detection_confidence=0.3,
+    min_tracking_confidence=0.3
+)
+>>>>>>> 6910925ecf9413850c413851fd0c782f3b258935
 
 def get_optional_current_user(
     authorization: Optional[str] = Header(None), 
@@ -110,62 +124,97 @@ def update_user_role(
         "new_role": user_to_update.role
     }
 
+@app.get("/admin/login-logs")
+def get_login_logs(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    logs = db.query(LoginLog).order_by(LoginLog.login_time.desc()).limit(200).all()
+    return [
+        {
+            "id": log.id,
+            "user_id": log.user_id,
+            "email": log.email,
+            "login_time": log.login_time.isoformat() if log.login_time else None,
+        }
+        for log in logs
+    ]
+
 # ==========================================
 # 🎯 Schema & Endpoints สำหรับกล้อง / Predict / WebSocket
 # ==========================================
-class SignData(BaseModel):
+class LandmarkPoint(BaseModel):
+    x: float
+    y: float
+    z: float
+
+class FrameLandmarks(BaseModel):
+    pose_world: Optional[List[LandmarkPoint]] = None
+    hand_left_world: Optional[List[LandmarkPoint]] = None
+    hand_right_world: Optional[List[LandmarkPoint]] = None
+
+class RealtimePredictRequest(BaseModel):
     lesson_id: Optional[str] = "1"
-    target_word: Optional[str] = None
-    hand_landmarks: List[float]
-    world_landmarks: Optional[List[float]] = []
+    target_word: str
+    frames: List[FrameLandmarks]
 
 @app.post("/predict")
-def predict(
-    data: SignData, 
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user)
-):
-    if not data.hand_landmarks or len(data.hand_landmarks) < 63:
-        raise HTTPException(status_code=400, detail="ข้อมูลพิกัดมือไม่สมบูรณ์")
+def predict(data: RealtimePredictRequest):
+    """
+    เทียบ buffer เฟรมล่าสุด (sliding window จากฝั่ง frontend) กับ Ground Truth จริงแบบเดียวกับ
+    /practice-compare/compare (ใช้ compute_features + compare_to_word ชุดเดียวกัน) แทนของเดิมที่
+    สุ่ม confidence มั่วๆ ทุก 500ms
+    ไม่บันทึกลง PracticeLog เพราะเป็นแค่ตัวช่วยแสดงผล real-time ระหว่างฝึก ไม่ใช่ผลสรุปการฝึกจริง
+    (ผลสรุปจริงมาจาก /practice-compare/compare ตอนกดหยุดอัดเท่านั้น)
+    """
+    if not data.target_word or not data.frames:
+        raise HTTPException(status_code=400, detail="ข้อมูลไม่สมบูรณ์")
 
-    target_word = data.target_word if (data.target_word and data.target_word.strip() != "") else "random_word"
-    predicted_word = target_word
-    confidence = round(random.uniform(0.85, 0.98), 2)
-    correctness_percentage = round(confidence * 100, 2)
-    is_correct = True
+    feature_list = []
+    for f in data.frames:
+        pose_world = (
+            np.array([[p.x, p.y, p.z] for p in f.pose_world], dtype=np.float32)
+            if f.pose_world else None
+        )
+        hand_left_world = (
+            np.array([[p.x, p.y, p.z] for p in f.hand_left_world], dtype=np.float32)
+            if f.hand_left_world else None
+        )
+        hand_right_world = (
+            np.array([[p.x, p.y, p.z] for p in f.hand_right_world], dtype=np.float32)
+            if f.hand_right_world else None
+        )
+        feature_list.append(compute_features(pose_world, hand_left_world, hand_right_world))
 
-    log_id = None
-    if current_user:
-        try:
-            new_log = PracticeLog(
-                user_id=current_user.id,
-                lesson_id=data.lesson_id or "1",
-                target_word=target_word,
-                predicted_word=predicted_word,
-                correctness_percentage=correctness_percentage,
-                confidence=confidence,
-                is_correct=is_correct,
-                created_at=datetime.utcnow()
-            )
-            db.add(new_log)
-            db.commit()
-            db.refresh(new_log)
-            log_id = new_log.id
-        except Exception as e:
-            db.rollback()
-            print(f"⚠️ บันทึกลง Postgres ไม่สำเร็จ: {e}")
+    user_feature_matrix = np.stack(feature_list, axis=0)
+
+    try:
+        result = compare_to_word(user_feature_matrix, data.target_word)
+    except FileNotFoundError:
+        return {
+            "status": "no_ground_truth",
+            "word": data.target_word,
+            "predicted_word": None,
+            "target_word": data.target_word,
+            "confidence": 0.0,
+            "correctness_percentage": 0.0,
+            "is_correct": False,
+        }
+
+    max_expected_score = result["threshold"] * 2
+    correctness_percentage = max(0.0, 100.0 * (1 - result["best_score"] / max_expected_score))
+    confidence = correctness_percentage / 100.0
 
     return {
         "status": "success",
-        "log_id": log_id,
-        "word": predicted_word,
-        "predicted_word": predicted_word,
-        "result": predicted_word,
-        "detected": predicted_word,
-        "target_word": target_word,
-        "confidence": confidence,
-        "correctness_percentage": correctness_percentage,
-        "is_correct": is_correct
+        "word": data.target_word if result["is_pass"] else "",
+        "predicted_word": data.target_word if result["is_pass"] else None,
+        "target_word": data.target_word,
+        "confidence": round(confidence, 4),
+        "correctness_percentage": round(correctness_percentage, 2),
+        "is_correct": result["is_pass"],
+        "best_score": result["best_score"],
+        "threshold": result["threshold"],
     }
 
 @app.get("/practice-history")

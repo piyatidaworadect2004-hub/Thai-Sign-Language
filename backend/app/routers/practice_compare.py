@@ -7,10 +7,12 @@ Endpoint สำหรับรับวิดีโอที่ผู้ใช�
 
 import os
 import tempfile
+import threading
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, Header, HTTPException, Depends
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -23,6 +25,48 @@ from app.sign_engine.engine import (
 )
 
 router = APIRouter()
+
+# โหลดโมเดล MediaPipe ครั้งเดียวตอน import module นี้ (ตอน server start)
+# แล้วใช้ซ้ำทุก request แทนการสร้าง/ปิดใหม่ทุกครั้ง (ตัดเวลาโหลดโมเดลที่ซ้ำซ้อน)
+_extractor = LandmarkExtractor()
+_extractor_lock = threading.Lock()
+
+
+def _extract_with_lock(video_path: str):
+    """รันใน threadpool (นอก event loop) ล็อกไว้กันสอง request เรียก extractor พร้อมกัน"""
+    with _extractor_lock:
+        return extract_feature_matrix_from_video(video_path, _extractor)
+
+
+def _save_practice_log(
+    db: Session,
+    current_user: User,
+    word: str,
+    lesson_id: str,
+    result: dict,
+    correctness_percentage: float,
+    confidence: float,
+) -> Optional[int]:
+    """รันใน threadpool เพราะ db.commit() เป็น network I/O แบบ blocking (sync SQLAlchemy)"""
+    try:
+        new_log = PracticeLog(
+            user_id=current_user.id,
+            lesson_id=lesson_id,
+            target_word=word,
+            predicted_word=word if result["is_pass"] else None,
+            correctness_percentage=round(correctness_percentage, 2),
+            confidence=round(confidence, 4),
+            is_correct=result["is_pass"],
+            created_at=datetime.utcnow(),
+        )
+        db.add(new_log)
+        db.commit()
+        db.refresh(new_log)
+        return new_log.id
+    except Exception as e:
+        db.rollback()
+        print(f"⚠️ บันทึกลง Postgres ไม่สำเร็จ: {e}")
+        return None
 
 
 def get_optional_current_user(
@@ -52,19 +96,17 @@ async def compare_practice_video(
         tmp.write(content)
         tmp_path = tmp.name
 
-    extractor = LandmarkExtractor()
     try:
-        user_feature_matrix = extract_feature_matrix_from_video(tmp_path, extractor)
+        user_feature_matrix = await run_in_threadpool(_extract_with_lock, tmp_path)
     except FileNotFoundError:
         raise HTTPException(status_code=400, detail="ไฟล์วิดีโอไม่สามารถเปิดได้")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
-        extractor.close()
         os.unlink(tmp_path)
 
     try:
-        result = compare_to_word(user_feature_matrix, word)
+        result = await run_in_threadpool(compare_to_word, user_feature_matrix, word)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -74,24 +116,16 @@ async def compare_practice_video(
 
     log_id = None
     if current_user:
-        try:
-            new_log = PracticeLog(
-                user_id=current_user.id,
-                lesson_id=lesson_id,
-                target_word=word,
-                predicted_word=word if result["is_pass"] else None,
-                correctness_percentage=round(correctness_percentage, 2),
-                confidence=round(confidence, 4),
-                is_correct=result["is_pass"],
-                created_at=datetime.utcnow(),
-            )
-            db.add(new_log)
-            db.commit()
-            db.refresh(new_log)
-            log_id = new_log.id
-        except Exception as e:
-            db.rollback()
-            print(f"⚠️ บันทึกลง Postgres ไม่สำเร็จ: {e}")
+        log_id = await run_in_threadpool(
+            _save_practice_log,
+            db,
+            current_user,
+            word,
+            lesson_id,
+            result,
+            correctness_percentage,
+            confidence,
+        )
 
     return {
         "status": "success",
