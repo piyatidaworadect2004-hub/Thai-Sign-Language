@@ -235,6 +235,7 @@ def get_practice_history(
             "id": log.id,
             "lesson_id": log.lesson_id,
             "confidence": log.confidence or (log.correctness_percentage / 100 if log.correctness_percentage else 0.9),
+            "is_correct": bool(log.is_correct),
             "created_at": log.created_at.isoformat() if log.created_at else datetime.utcnow().isoformat(),
             "lesson": {
                 "word": log.target_word or f"บทเรียนที่ {log.lesson_id}"

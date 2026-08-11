@@ -17,6 +17,7 @@ def _build_overview(user_id: int, db: Session):
             Category.total_words.label("total_words"),
             func.count(func.distinct(PracticeLog.target_word)).label("words_practiced"),
             func.round(cast(func.avg(PracticeLog.correctness_percentage), Numeric), 2).label("avg_correctness"),
+            func.max(PracticeLog.created_at).label("last_practiced_at"),
         )
         .outerjoin(Lesson, Lesson.category_id == Category.id)
         .outerjoin(
@@ -46,6 +47,7 @@ def _build_overview(user_id: int, db: Session):
             "words_practiced": words_practiced,
             "completion_percentage": completion_percentage,
             "correctness_percentage": float(row.avg_correctness) if row.avg_correctness is not None else 0,
+            "last_practiced_at": row.last_practiced_at.isoformat() if row.last_practiced_at else None,
         })
 
     return overview

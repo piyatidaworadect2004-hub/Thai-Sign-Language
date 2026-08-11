@@ -59,16 +59,8 @@ export default function Lesson() {
           ) : (
             <div className="text-center p-6">
               <span className="text-white text-lg font-medium block">
-                🎥 วิดีโอตัวอย่างท่าทางภาษามือ
+                🎥 ยังไม่มีวิดีโอตัวอย่างสำหรับคำนี้
               </span>
-              <a
-                href="https://dic.ttrs.or.th/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 text-sm underline mt-2 inline-block"
-              >
-                ดูตัวอย่างเพิ่มเติมจากแหล่งข้อมูลภายนอก (TTRS)
-              </a>
             </div>
           )}
         </div>

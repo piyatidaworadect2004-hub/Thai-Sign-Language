@@ -8,6 +8,7 @@ Endpoint สำหรับรับวิดีโอที่ผู้ใช�
 import os
 import tempfile
 import threading
+import urllib.request
 from datetime import datetime
 from typing import Optional
 
@@ -16,12 +17,13 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import PracticeLog, User
-from app.routers.auth import get_current_user
+from app.models import Lesson, PracticeLog, User
+from app.routers.auth import get_current_user, require_admin
 from app.sign_engine.engine import (
     LandmarkExtractor,
     extract_feature_matrix_from_video,
     compare_to_word,
+    save_ground_truth_sample,
 )
 
 router = APIRouter()
@@ -134,4 +136,56 @@ async def compare_practice_video(
         "correctness_percentage": round(correctness_percentage, 2),
         "confidence": round(confidence, 4),
         **result,
+    }
+
+
+@router.post("/build-ground-truth/{lesson_id}")
+async def build_ground_truth_from_video(
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    """
+    สร้าง Ground Truth ให้คำศัพท์นี้อัตโนมัติ โดยดึงวิดีโอจาก lesson.video_url มาผ่าน
+    sign_engine ตัวเดียวกับที่ใช้ตอนฝึกจริง แล้วเปิด is_active ให้เองถ้าสำเร็จ
+    (ใช้ extractor ตัวเดียวกับ /compare กันโหลดโมเดล MediaPipe ซ้ำสองชุด)
+    """
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="ไม่พบคำศัพท์นี้")
+    if not lesson.video_url:
+        raise HTTPException(status_code=400, detail="คำนี้ยังไม่มี Video URL ตัวอย่าง กรุณาใส่ก่อน")
+
+    suffix = os.path.splitext(lesson.video_url.split("?")[0])[1] or ".mp4"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            await run_in_threadpool(urllib.request.urlretrieve, lesson.video_url, tmp_path)
+        except Exception:
+            raise HTTPException(status_code=400, detail="ดาวน์โหลดวิดีโอจาก video_url ไม่สำเร็จ")
+
+        try:
+            feature_matrix = await run_in_threadpool(_extract_with_lock, tmp_path)
+        except FileNotFoundError:
+            raise HTTPException(status_code=400, detail="ไฟล์วิดีโอไม่สามารถเปิดได้")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    num_samples = await run_in_threadpool(save_ground_truth_sample, lesson.title, feature_matrix)
+
+    lesson.is_active = True
+    db.commit()
+
+    return {
+        "status": "success",
+        "word": lesson.title,
+        "num_frames": int(feature_matrix.shape[0]),
+        "num_samples": num_samples,
+        "is_active": lesson.is_active,
     }

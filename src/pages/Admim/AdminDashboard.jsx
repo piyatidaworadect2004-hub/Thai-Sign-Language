@@ -21,6 +21,13 @@ export default function AdminDashboard() {
   const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
   const [addingLesson, setAddingLesson] = useState(false);
 
+  // ★ เพิ่ม: แก้ไข video_url ของคำที่มีอยู่แล้ว (แยกจากฟอร์มเพิ่มคำใหม่ด้านบน)
+  const [editingVideoId, setEditingVideoId] = useState(null);
+  const [editingVideoUrl, setEditingVideoUrl] = useState('');
+
+  // ★ เพิ่ม: สร้าง Ground Truth อัตโนมัติจากวิดีโอตัวอย่าง (video_url) ของคำนั้น
+  const [buildingGtId, setBuildingGtId] = useState(null);
+
   useEffect(() => {
     const role = localStorage.getItem('role');
     if (role !== 'admin') {
@@ -92,6 +99,10 @@ export default function AdminDashboard() {
       alert('กรุณาเลือกหมวดหมู่');
       return;
     }
+    if (!newLessonVideoUrl.trim()) {
+      alert('กรุณาใส่ Video URL ตัวอย่าง (ใช้สร้าง Ground Truth ให้คำนี้ต่อได้เลย)');
+      return;
+    }
 
     setAddingLesson(true);
     try {
@@ -153,6 +164,75 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error toggling is_active:', error);
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
+  };
+
+  const startEditVideo = (lesson) => {
+    setEditingVideoId(lesson.id);
+    setEditingVideoUrl(lesson.video_url || '');
+  };
+
+  const cancelEditVideo = () => {
+    setEditingVideoId(null);
+    setEditingVideoUrl('');
+  };
+
+  const saveVideoUrl = async (lessonId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const trimmedUrl = editingVideoUrl.trim() || null;
+      const res = await fetch(`http://127.0.0.1:8000/lessons/${lessonId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ video_url: trimmedUrl }),
+      });
+
+      if (res.ok) {
+        setLessons((prev) =>
+          prev.map((l) => (l.id === lessonId ? { ...l, video_url: trimmedUrl } : l))
+        );
+        cancelEditVideo();
+      } else {
+        alert('บันทึก Video URL ไม่สำเร็จ');
+      }
+    } catch (error) {
+      console.error('Error saving video_url:', error);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
+  };
+
+  const handleBuildGroundTruth = async (lesson) => {
+    if (!lesson.video_url) {
+      alert('คำนี้ยังไม่มี Video URL ตัวอย่าง ใส่ก่อนถึงจะสร้าง Ground Truth ได้');
+      return;
+    }
+
+    setBuildingGtId(lesson.id);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://127.0.0.1:8000/practice-compare/build-ground-truth/${lesson.id}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(`สร้าง Ground Truth สำเร็จ (${data.num_frames} เฟรม, ${data.num_samples} ตัวอย่างสะสม) — เปิดใช้งานคำนี้ให้อัตโนมัติแล้ว`);
+        setLessons((prev) =>
+          prev.map((l) => (l.id === lesson.id ? { ...l, is_active: true } : l))
+        );
+      } else {
+        alert(data.detail || 'สร้าง Ground Truth ไม่สำเร็จ');
+      }
+    } catch (error) {
+      console.error('Error building ground truth:', error);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setBuildingGtId(null);
     }
   };
 
@@ -342,7 +422,8 @@ export default function AdminDashboard() {
 
                 <input
                   type="text"
-                  placeholder="Video URL (ไม่บังคับ)"
+                  required
+                  placeholder="Video URL * (บังคับใส่ — ใช้สร้าง Ground Truth ให้คำนี้)"
                   value={newLessonVideoUrl}
                   onChange={(e) => setNewLessonVideoUrl(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -367,6 +448,7 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อคำศัพท์</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">หมวดหมู่</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วิดีโอ</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">สถานะ</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">จัดการ</th>
                     </tr>
@@ -378,6 +460,45 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{lesson.title}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {getCategoryName(lesson.category_id)}
+                        </td>
+                        {/* ★ เพิ่มใหม่: แก้ไข video_url ของคำที่มีอยู่แล้ว */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {editingVideoId === lesson.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingVideoUrl}
+                                onChange={(e) => setEditingVideoUrl(e.target.value)}
+                                placeholder="วาง Video URL ที่นี่"
+                                className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <button
+                                onClick={() => saveVideoUrl(lesson.id)}
+                                className="text-green-600 hover:text-green-800 text-xs font-semibold"
+                              >
+                                บันทึก
+                              </button>
+                              <button
+                                onClick={cancelEditVideo}
+                                className="text-gray-400 hover:text-gray-600 text-xs"
+                              >
+                                ยกเลิก
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className={lesson.video_url ? 'text-green-600 text-xs font-medium' : 'text-gray-400 text-xs'}>
+                                {lesson.video_url ? '✅ มีวิดีโอ' : '— ไม่มี'}
+                              </span>
+                              <button
+                                onClick={() => startEditVideo(lesson)}
+                                className="text-blue-500 hover:text-blue-700 text-xs underline"
+                              >
+                                แก้ไข
+                              </button>
+                            </div>
+                          )}
                         </td>
                         {/* ★ เพิ่มใหม่: toggle is_active */}
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
@@ -392,7 +513,15 @@ export default function AdminDashboard() {
                             {lesson.is_active ? '✅ เปิดใช้งาน' : '⚪ ปิดใช้งาน'}
                           </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
+                          <button
+                            onClick={() => handleBuildGroundTruth(lesson)}
+                            disabled={!lesson.video_url || buildingGtId === lesson.id}
+                            title={!lesson.video_url ? 'ต้องมี Video URL ก่อน' : 'ประมวลผลวิดีโอตัวอย่างเป็น Ground Truth ให้คำนี้'}
+                            className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-200 transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {buildingGtId === lesson.id ? '⏳ กำลังสร้าง...' : '🎯 สร้าง Ground Truth'}
+                          </button>
                           <button
                             onClick={() => handleDeleteLesson(lesson.id)}
                             className="bg-red-100 text-red-600 px-3 py-1 rounded-lg hover:bg-red-200 transition"
@@ -476,30 +605,114 @@ export default function AdminDashboard() {
                   ยังไม่ได้เลือกผู้ใช้ หรือไม่มีข้อมูลความคืบหน้า
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {reports.map((r) => (
-                    <div key={r.category_id} className="border border-gray-200 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-gray-800">{r.category_name}</h3>
-                        <span className="text-sm font-bold text-blue-600">
-                          {r.completion_percentage}%
-                        </span>
-                      </div>
+                <>
+                  {/* legend — 2 series ต้องมี legend เสมอ */}
+                  <div className="flex items-center gap-5 text-xs text-gray-500 mb-3">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#2a78d6' }} />
+                      ความคืบหน้า (% คำที่เคยฝึก)
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#eb6834' }} />
+                      ความแม่นยำเฉลี่ย (%)
+                    </span>
+                  </div>
 
-                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden mb-2">
-                        <div
-                          className="h-3 rounded-full bg-blue-500 transition-all"
-                          style={{ width: `${Math.min(r.completion_percentage, 100)}%` }}
-                        />
-                      </div>
+                  {/* กราฟแท่งเทียบ 2 ตัวชี้วัดต่อหมวดหมู่ */}
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl p-4 mb-4">
+                    <svg
+                      viewBox={`0 0 560 ${28 + reports.length * 56 + 8}`}
+                      role="img"
+                      aria-label={`กราฟความคืบหน้าและความแม่นยำเฉลี่ยของ ${selectedUserLabel || 'ผู้ใช้'} แยกตามหมวดหมู่`}
+                      className="w-full"
+                      style={{ minWidth: 480 }}
+                    >
+                      {/* gridlines + tick labels (0/25/50/75/100%) */}
+                      {[0, 25, 50, 75, 100].map((pct) => {
+                        const x = 180 + (pct / 100) * 340;
+                        const bottomY = 28 + reports.length * 56;
+                        return (
+                          <g key={pct}>
+                            <line x1={x} y1={20} x2={x} y2={bottomY} stroke="#e5e7eb" strokeWidth="1" />
+                            <text x={x} y={14} textAnchor="middle" fontSize="10" fill="#9ca3af">{pct}%</text>
+                          </g>
+                        );
+                      })}
 
-                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
-                        <span>ฝึกไปแล้ว {r.words_practiced} / {r.total_words} คำ</span>
-                        <span>ความใกล้เคียงเฉลี่ย: {r.correctness_percentage}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      {reports.map((r, i) => {
+                        const rowY = 28 + i * 56;
+                        const groupCenter = rowY + 28;
+                        const completion = Math.min(r.completion_percentage, 100);
+                        const correctness = Math.min(r.correctness_percentage, 100);
+                        const plotW = 340;
+                        const leftX = 180;
+
+                        const roundedBar = (value, y) => {
+                          const w = (value / 100) * plotW;
+                          const rr = Math.min(4, w);
+                          if (w <= 0) return '';
+                          return `M${leftX},${y} h${w - rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${14 - 2 * rr} a${rr},${rr} 0 0 1 ${-rr},${rr} h${-(w - rr)} Z`;
+                        };
+
+                        const bar1Y = groupCenter - 2 - 14;
+                        const bar2Y = groupCenter + 2;
+
+                        return (
+                          <g key={r.category_id}>
+                            <title>
+                              {r.category_name}: ความคืบหน้า {completion}%, ความแม่นยำเฉลี่ย {correctness}%
+                            </title>
+
+                            <text
+                              x={leftX - 10}
+                              y={groupCenter}
+                              textAnchor="end"
+                              dominantBaseline="middle"
+                              fontSize="12"
+                              fill="#374151"
+                            >
+                              {r.category_name}
+                            </text>
+
+                            <path d={roundedBar(completion, bar1Y)} fill="#2a78d6" />
+                            <text x={leftX + (completion / 100) * plotW + 6} y={bar1Y + 7} dominantBaseline="middle" fontSize="10" fill="#52514e">
+                              {completion}%
+                            </text>
+
+                            <path d={roundedBar(correctness, bar2Y)} fill="#eb6834" />
+                            <text x={leftX + (correctness / 100) * plotW + 6} y={bar2Y + 7} dominantBaseline="middle" fontSize="10" fill="#52514e">
+                              {correctness}%
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+
+                  {/* table view — ตัวเลขจริงครบทุกหมวด (accessibility: ไม่ต้องพึ่งกราฟอย่างเดียว) */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                          <th className="py-2 pr-4 font-medium">หมวดหมู่</th>
+                          <th className="py-2 pr-4 font-medium">ฝึกไปแล้ว</th>
+                          <th className="py-2 pr-4 font-medium">ความคืบหน้า</th>
+                          <th className="py-2 font-medium">ความแม่นยำเฉลี่ย</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reports.map((r) => (
+                          <tr key={r.category_id} className="border-b border-gray-50">
+                            <td className="py-2 pr-4 text-gray-700">{r.category_name}</td>
+                            <td className="py-2 pr-4 text-gray-500">{r.words_practiced} / {r.total_words} คำ</td>
+                            <td className="py-2 pr-4 text-gray-500">{r.completion_percentage}%</td>
+                            <td className="py-2 text-gray-500">{r.correctness_percentage}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           )}

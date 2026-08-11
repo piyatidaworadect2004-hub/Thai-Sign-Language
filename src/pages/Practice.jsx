@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import Navbar from "../components/Navbar";
+import { saveAfterPractice } from "../services/practiceService";
 
 const HAND_CONNECTIONS = [
     [0, 1], [1, 2], [2, 3], [3, 4],
@@ -43,6 +44,9 @@ export default function Practice() {
     const [targetWord, setTargetWord] = useState(location.state?.word || "");
     const [isActive, setIsActive] = useState(location.state?.isActive ?? null);
     const [lessonLoading, setLessonLoading] = useState(!location.state);
+    const [nextLesson, setNextLesson] = useState(null);
+    const [videoUrl, setVideoUrl] = useState(null);
+    const [dbVideoFailed, setDbVideoFailed] = useState(false);
 
     const lastPredictTime = useRef(0);
     const isMounted = useRef(true);
@@ -85,6 +89,55 @@ export default function Practice() {
 
         fetchLessonInfo();
     }, [id, location.state]);
+
+    // หาคำถัดไปในหมวดหมู่เดียวกัน (สำหรับปุ่ม "ฝึกคำถัดไป" หลังฝึกผ่าน)
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchNextLesson() {
+            try {
+                const response = await fetch("http://localhost:8000/categories");
+                if (!response.ok) return;
+                const data = await response.json();
+
+                for (const category of data) {
+                    const lessons = category.lessons || [];
+                    const index = lessons.findIndex((l) => String(l.id) === String(id));
+                    if (index === -1) continue;
+
+                    const upcoming = lessons.slice(index + 1).find((l) => l.is_active);
+                    if (!cancelled) setNextLesson(upcoming || null);
+                    return;
+                }
+                if (!cancelled) setNextLesson(null);
+            } catch (error) {
+                console.error("หาคำถัดไปไม่สำเร็จ:", error);
+            }
+        }
+
+        fetchNextLesson();
+        return () => { cancelled = true; };
+    }, [id]);
+
+    // วิดีโอตัวอย่างท่า — ใช้ video_url จาก DB เป็นหลัก (ที่มาเดียวกับหน้า Lesson.jsx)
+    // ถ้าไม่มีหรือเล่นไม่ได้ ค่อย fallback ไปไฟล์ local /videos/{คำ}.mp4
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchVideoUrl() {
+            try {
+                const response = await fetch(`http://localhost:8000/lessons/${id}`);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!cancelled) setVideoUrl(data.video_url || null);
+            } catch (error) {
+                console.error("โหลด video_url ไม่สำเร็จ:", error);
+            }
+        }
+
+        fetchVideoUrl();
+        return () => { cancelled = true; };
+    }, [id]);
 
     useEffect(() => {
         setExampleVideoAvailable(true);
@@ -192,26 +245,11 @@ export default function Practice() {
         setCompareError("");
 
         try {
-            const token = localStorage.getItem("token");
-            const formData = new FormData();
-            formData.append("word", targetWord);
-            formData.append("lesson_id", id || "1");
-            formData.append("file", blob, "practice.webm");
-
-            const response = await fetch("http://localhost:8000/practice-compare/compare", {
-                method: "POST",
-                headers: {
-                    ...(token && { Authorization: `Bearer ${token}` })
-                },
-                body: formData,
+            const result = await saveAfterPractice({
+                word: targetWord,
+                lessonId: id,
+                videoBlob: blob,
             });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(errText || `เกิดข้อผิดพลาด (${response.status})`);
-            }
-
-            const result = await response.json();
             if (isMounted.current) setCompareResult(result);
         } catch (error) {
             console.error("Compare API error:", error);
@@ -498,7 +536,14 @@ export default function Practice() {
                         <p className="text-sm text-gray-500 mb-3">ท่ามือสำหรับคำว่า "{targetWord}"</p>
 
                         <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
-                            {exampleVideoAvailable ? (
+                            {videoUrl && !dbVideoFailed ? (
+                                <video
+                                    src={videoUrl}
+                                    controls
+                                    className="w-full h-full object-contain"
+                                    onError={() => setDbVideoFailed(true)}
+                                />
+                            ) : exampleVideoAvailable ? (
                                 <video
                                     src={`/videos/${targetWord}.mp4`}
                                     controls
@@ -514,16 +559,18 @@ export default function Practice() {
                         </div>
 
                         <p className="text-xs text-gray-400 mt-2">
-                            {exampleVideoAvailable ? "พร้อมเล่นวิดีโอตัวอย่าง" : "ลองดูตัวอย่างจาก TTRS แทนได้ที่ลิงก์ด้านล่าง"}
+                            {(videoUrl && !dbVideoFailed) || exampleVideoAvailable
+                                ? "พร้อมเล่นวิดีโอตัวอย่าง"
+                                : "ยังไม่มีวิดีโอตัวอย่างสำหรับคำนี้ในระบบ"}
                         </p>
-                        {!exampleVideoAvailable && (
+                        {videoUrl && dbVideoFailed && (
                             <a
-                                href="https://dic.ttrs.or.th/video/view/61c5797966b04b724e244611"
+                                href={videoUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-2 mt-2 text-sm text-blue-600 hover:text-blue-700 underline"
                             >
-                                ดูตัวอย่างท่าภาษามือจาก TTRS
+                                เล่นในหน้านี้ไม่ได้ — เปิดวิดีโอในแท็บใหม่แทน
                             </a>
                         )}
                     </div>
@@ -647,10 +694,51 @@ export default function Practice() {
                                 <p className="text-xs text-gray-500 mt-1">
                                     DTW Score: {compareResult.best_score} (threshold = {compareResult.threshold})
                                 </p>
-                                {compareResult.log_id && (
+                                {compareResult.log_id ? (
                                     <p className="text-xs text-gray-500 mt-1">
                                         บันทึกผลแล้ว (Log ID: {compareResult.log_id})
                                     </p>
+                                ) : (
+                                    <p className="text-xs text-orange-500 font-semibold mt-1">
+                                        ⚠ ผลนี้ยังไม่ถูกบันทึก เนื่องจากคุณยังไม่ได้เข้าสู่ระบบ —{" "}
+                                        <button
+                                            onClick={() => navigate("/login")}
+                                            className="underline hover:text-orange-600"
+                                        >
+                                            เข้าสู่ระบบ
+                                        </button>
+                                        {" "}เพื่อบันทึกความคืบหน้า
+                                    </p>
+                                )}
+
+                                {compareResult.is_pass && (
+                                    <div className="mt-4 flex flex-wrap gap-3">
+                                        <button
+                                            onClick={() => {
+                                                setCompareResult(null);
+                                                setCompareError("");
+                                            }}
+                                            className="border-2 border-blue-500 text-blue-600 px-4 py-2 rounded-xl font-bold transition hover:bg-blue-50"
+                                        >
+                                            🔁 ฝึกคำนี้อีกครั้ง
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (!nextLesson) return;
+                                                navigate(`/practice/${nextLesson.id}`, {
+                                                    state: {
+                                                        word: nextLesson.word || nextLesson.title,
+                                                        isActive: true,
+                                                    },
+                                                });
+                                            }}
+                                            disabled={!nextLesson}
+                                            title={!nextLesson ? "ยังไม่มีคำถัดไปในหมวดนี้" : undefined}
+                                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl font-bold transition"
+                                        >
+                                            ▶ ฝึกคำถัดไป
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         ) : (
