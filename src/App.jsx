@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Home from "./pages/Home";
@@ -21,6 +21,13 @@ function ProtectedRoute({ children }) {
 
   // มี Token -> อนุญาตให้เข้าถึงหน้านั้นๆ ได้
   return children;
+}
+
+// เพิ่ม key={id} ให้ Practice remount ใหม่ทุกครั้งที่เปลี่ยนคำ (เช่น กดปุ่ม "ฝึกคำถัดไป")
+// ไม่งั้น React Router จะใช้ instance เดิม ทำให้ state เก่า (ผลตรวจ, กล้อง, ฯลฯ) ค้างข้ามคำ
+function PracticeRoute() {
+  const { id } = useParams();
+  return <Practice key={id} />;
 }
 
 export default function App() {
@@ -74,7 +81,7 @@ export default function App() {
           path="/practice/:id"
           element={
             <ProtectedRoute>
-              <Practice />
+              <PracticeRoute />
             </ProtectedRoute>
           }
         />

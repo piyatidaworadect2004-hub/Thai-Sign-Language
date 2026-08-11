@@ -21,6 +21,13 @@ export default function AdminDashboard() {
   const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
   const [addingLesson, setAddingLesson] = useState(false);
 
+  // ★ เพิ่ม: แก้ไข video_url ของคำที่มีอยู่แล้ว (แยกจากฟอร์มเพิ่มคำใหม่ด้านบน)
+  const [editingVideoId, setEditingVideoId] = useState(null);
+  const [editingVideoUrl, setEditingVideoUrl] = useState('');
+
+  // ★ เพิ่ม: สร้าง Ground Truth อัตโนมัติจากวิดีโอตัวอย่าง (video_url) ของคำนั้น
+  const [buildingGtId, setBuildingGtId] = useState(null);
+
   useEffect(() => {
     const role = localStorage.getItem('role');
     if (role !== 'admin') {
@@ -153,6 +160,75 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error toggling is_active:', error);
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
+  };
+
+  const startEditVideo = (lesson) => {
+    setEditingVideoId(lesson.id);
+    setEditingVideoUrl(lesson.video_url || '');
+  };
+
+  const cancelEditVideo = () => {
+    setEditingVideoId(null);
+    setEditingVideoUrl('');
+  };
+
+  const saveVideoUrl = async (lessonId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const trimmedUrl = editingVideoUrl.trim() || null;
+      const res = await fetch(`http://127.0.0.1:8000/lessons/${lessonId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ video_url: trimmedUrl }),
+      });
+
+      if (res.ok) {
+        setLessons((prev) =>
+          prev.map((l) => (l.id === lessonId ? { ...l, video_url: trimmedUrl } : l))
+        );
+        cancelEditVideo();
+      } else {
+        alert('บันทึก Video URL ไม่สำเร็จ');
+      }
+    } catch (error) {
+      console.error('Error saving video_url:', error);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
+  };
+
+  const handleBuildGroundTruth = async (lesson) => {
+    if (!lesson.video_url) {
+      alert('คำนี้ยังไม่มี Video URL ตัวอย่าง ใส่ก่อนถึงจะสร้าง Ground Truth ได้');
+      return;
+    }
+
+    setBuildingGtId(lesson.id);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://127.0.0.1:8000/practice-compare/build-ground-truth/${lesson.id}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(`สร้าง Ground Truth สำเร็จ (${data.num_frames} เฟรม, ${data.num_samples} ตัวอย่างสะสม) — เปิดใช้งานคำนี้ให้อัตโนมัติแล้ว`);
+        setLessons((prev) =>
+          prev.map((l) => (l.id === lesson.id ? { ...l, is_active: true } : l))
+        );
+      } else {
+        alert(data.detail || 'สร้าง Ground Truth ไม่สำเร็จ');
+      }
+    } catch (error) {
+      console.error('Error building ground truth:', error);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setBuildingGtId(null);
     }
   };
 
@@ -367,6 +443,7 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อคำศัพท์</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">หมวดหมู่</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วิดีโอ</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">สถานะ</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">จัดการ</th>
                     </tr>
@@ -378,6 +455,45 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{lesson.title}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {getCategoryName(lesson.category_id)}
+                        </td>
+                        {/* ★ เพิ่มใหม่: แก้ไข video_url ของคำที่มีอยู่แล้ว */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {editingVideoId === lesson.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingVideoUrl}
+                                onChange={(e) => setEditingVideoUrl(e.target.value)}
+                                placeholder="วาง Video URL ที่นี่"
+                                className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <button
+                                onClick={() => saveVideoUrl(lesson.id)}
+                                className="text-green-600 hover:text-green-800 text-xs font-semibold"
+                              >
+                                บันทึก
+                              </button>
+                              <button
+                                onClick={cancelEditVideo}
+                                className="text-gray-400 hover:text-gray-600 text-xs"
+                              >
+                                ยกเลิก
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className={lesson.video_url ? 'text-green-600 text-xs font-medium' : 'text-gray-400 text-xs'}>
+                                {lesson.video_url ? '✅ มีวิดีโอ' : '— ไม่มี'}
+                              </span>
+                              <button
+                                onClick={() => startEditVideo(lesson)}
+                                className="text-blue-500 hover:text-blue-700 text-xs underline"
+                              >
+                                แก้ไข
+                              </button>
+                            </div>
+                          )}
                         </td>
                         {/* ★ เพิ่มใหม่: toggle is_active */}
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
@@ -392,7 +508,15 @@ export default function AdminDashboard() {
                             {lesson.is_active ? '✅ เปิดใช้งาน' : '⚪ ปิดใช้งาน'}
                           </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
+                          <button
+                            onClick={() => handleBuildGroundTruth(lesson)}
+                            disabled={!lesson.video_url || buildingGtId === lesson.id}
+                            title={!lesson.video_url ? 'ต้องมี Video URL ก่อน' : 'ประมวลผลวิดีโอตัวอย่างเป็น Ground Truth ให้คำนี้'}
+                            className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-200 transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {buildingGtId === lesson.id ? '⏳ กำลังสร้าง...' : '🎯 สร้าง Ground Truth'}
+                          </button>
                           <button
                             onClick={() => handleDeleteLesson(lesson.id)}
                             className="bg-red-100 text-red-600 px-3 py-1 rounded-lg hover:bg-red-200 transition"

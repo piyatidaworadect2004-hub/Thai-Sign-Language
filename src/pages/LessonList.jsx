@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { getPracticeHistory, isSaved } from "../services/practiceService";
 
 export default function LessonList() {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [history, setHistory] = useState([]);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -28,6 +30,12 @@ export default function LessonList() {
         }
 
         fetchLessons();
+    }, []);
+
+    // ประวัติการฝึกของ user ที่ login อยู่ ดึงมาครั้งเดียวแล้วเช็ค isSaved ต่อคำจากในนี้
+    // (กันไม่ให้ยิง API แยกต่อการ์ดคำศัพท์แต่ละใบ)
+    useEffect(() => {
+        getPracticeHistory().then(setHistory);
     }, []);
 
     // กรองให้เหลือแค่หมวดที่เลือกมา (ถ้ามี categoryId ติดมา)
@@ -76,6 +84,8 @@ export default function LessonList() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 {category.lessons && category.lessons.map((lesson) => {
                                     const isActive = lesson.is_active ?? lesson.isActive ?? false;
+                                    const word = lesson.word || lesson.title;
+                                    const passed = isSaved(history, word);
 
                                     return (
                                         <div
@@ -84,7 +94,7 @@ export default function LessonList() {
                                                 if (!isActive) return;
                                                 navigate(`/practice/${lesson.id}`, {
                                                     state: {
-                                                        word: lesson.word || lesson.title,
+                                                        word,
                                                         isActive,
                                                     },
                                                 });
@@ -96,9 +106,16 @@ export default function LessonList() {
                                             }`}
                                         >
                                             <div>
-                                                <h3 className="text-xl font-bold text-gray-800 mb-1">
-                                                    {lesson.word || lesson.title}
-                                                </h3>
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <h3 className="text-xl font-bold text-gray-800 mb-1">
+                                                        {word}
+                                                    </h3>
+                                                    {passed && (
+                                                        <span className="shrink-0 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+                                                            ✅ ฝึกผ่านแล้ว
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-sm text-gray-500 line-clamp-2">
                                                     {lesson.description || "ฝึกท่าทางภาษามือบทเรียนนี้"}
                                                 </p>
@@ -107,7 +124,7 @@ export default function LessonList() {
                                                 {isActive ? (
                                                     <>
                                                         <span className="text-xs bg-blue-500 text-white px-3 py-1 rounded-full font-semibold">
-                                                            เริ่มฝึกซ้อม
+                                                            {passed ? "ฝึกอีกครั้ง" : "เริ่มฝึกซ้อม"}
                                                         </span>
                                                         <span className="text-blue-600 font-bold">→</span>
                                                     </>

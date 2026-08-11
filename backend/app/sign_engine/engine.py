@@ -198,6 +198,32 @@ def load_ground_truth_matrices(word: str) -> np.ndarray:
     return _gt_cache[word]
 
 
+def save_ground_truth_sample(word: str, feature_matrix: np.ndarray) -> int:
+    """
+    เพิ่ม feature_matrix (จากวิดีโอตัวอย่าง 1 คลิป) เข้า gt_data/{word}.npz
+    ถ้าคำนี้มี Ground Truth อยู่แล้วจะสะสมเป็นตัวอย่างที่ 2, 3, ... ไม่ทับของเดิม
+    (รูปแบบไฟล์เดียวกับ ground_truth_pipeline/ground_truth_builder.py เพื่อให้ compare_to_word อ่านได้ตรงๆ)
+    คืนค่าจำนวนตัวอย่างทั้งหมดของคำนี้หลังบันทึก
+    """
+    os.makedirs(GT_DATA_DIR, exist_ok=True)
+    npz_path = os.path.join(GT_DATA_DIR, f"{word}.npz")
+
+    existing_matrices = []
+    if os.path.exists(npz_path):
+        old_data = np.load(npz_path, allow_pickle=True)
+        if "feature_matrices" in old_data:
+            existing_matrices = list(old_data["feature_matrices"])
+
+    feature_matrices = existing_matrices + [feature_matrix]
+    np.savez_compressed(
+        npz_path,
+        feature_matrices=np.array(feature_matrices, dtype=object),
+    )
+
+    _gt_cache.pop(word, None)  # เคลียร์ cache กันอ่านของเก่าซ้ำในคำขอถัดไป
+    return len(feature_matrices)
+
+
 def compare_to_word(user_feature_matrix: np.ndarray, word: str, threshold: float = 0.15) -> dict:
     feature_matrices = load_ground_truth_matrices(word)
 

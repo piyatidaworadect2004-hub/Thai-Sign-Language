@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Category, UserProgress, User
+from app.models import Category, User
 from app.schemas import CategoryBase, CategoryOut
 from app.routers.auth import get_current_user
+from app.routers.progress import _build_overview
 
 router = APIRouter()
 
@@ -35,14 +36,12 @@ def get_categories(
     categories = db.query(Category).all()
 
     # ★ ดึง progress ของ user คนนี้ทั้งหมดมาเตรียมไว้ครั้งเดียว (กัน query ซ้ำในลูป)
+    # ใช้สูตรเดียวกับ /progress/me/overview เสมอ (นับคำที่เคยฝึกอย่างน้อย 1 ครั้ง)
+    # กันไม่ให้เลขไม่ตรงกับหน้า Home ที่อ่านจาก overview โดยตรง
     progress_by_category = {}
     if current_user:
-        rows = (
-            db.query(UserProgress)
-            .filter(UserProgress.user_id == current_user.id)
-            .all()
-        )
-        progress_by_category = {row.category_id: row.completion_percentage for row in rows}
+        overview = _build_overview(current_user.id, db)
+        progress_by_category = {row["category_id"]: row["completion_percentage"] for row in overview}
 
     # ★ สร้าง response เอง (dict) แทนการ serialize ORM object ตรงๆ
     # เพราะ Category.progress (relationship) กับ progress (int ที่ frontend ต้องการ) ชื่อชนกัน
@@ -87,16 +86,10 @@ def get_category(
 
     progress_value = 0
     if current_user:
-        row = (
-            db.query(UserProgress)
-            .filter(
-                UserProgress.user_id == current_user.id,
-                UserProgress.category_id == category_id,
-            )
-            .first()
-        )
-        if row:
-            progress_value = row.completion_percentage
+        overview = _build_overview(current_user.id, db)
+        match = next((row for row in overview if row["category_id"] == category_id), None)
+        if match:
+            progress_value = match["completion_percentage"]
 
     return {
         "id": category.id,
