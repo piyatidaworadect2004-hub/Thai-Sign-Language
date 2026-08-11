@@ -20,12 +20,6 @@ from app.models import User, PracticeLog, LoginLog
 from app.sign_engine.engine import compute_features, compare_to_word
 Base.metadata.create_all(bind=engine)
 
-<<<<<<< HEAD
-=======
-# ==========================================
-# 🟢 ตรวจสอบว่า mp.solutions.hands ใช้งานได้ไหม (บาง build ของ mediapipe ไม่มี solutions API)
-# ==========================================
->>>>>>> 6910925ecf9413850c413851fd0c782f3b258935
 mp_hands = None
 if hasattr(mp, "solutions") and hasattr(mp.solutions, "hands"):
     mp_hands = mp.solutions.hands
@@ -59,7 +53,6 @@ app.include_router(progress.router, prefix="/progress", tags=["Progress"])
 app.include_router(practice_compare.router, prefix="/practice-compare", tags=["Practice Compare"])
 
 # 🟢 ตั้งค่าให้รองรับการตรวจจับสูงสุด 2 มือ
-<<<<<<< HEAD
 hands_detector = None
 if mp_hands is not None:
     hands_detector = mp_hands.Hands(
@@ -68,14 +61,6 @@ if mp_hands is not None:
         min_detection_confidence=0.3,
         min_tracking_confidence=0.3
     )
-=======
-hands_detector = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=2,            # 👈 รองรับสูงสุด 2 มือ
-    min_detection_confidence=0.3,
-    min_tracking_confidence=0.3
-)
->>>>>>> 6910925ecf9413850c413851fd0c782f3b258935
 
 def get_optional_current_user(
     authorization: Optional[str] = Header(None), 
