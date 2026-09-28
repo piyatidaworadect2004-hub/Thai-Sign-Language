@@ -51,7 +51,9 @@ def get_categories(
             "id": cat.id,
             "name": cat.name,
             "description": cat.description,
-            "total_words": cat.total_words,
+            # ★ แก้: นับสดจากจำนวน Lesson จริงในหมวดนี้ แทน cat.total_words ที่แอดมินต้องกรอกเอง
+            # (กันปัญหาหมวดใหม่ที่ยังไม่มีใครกรอกเลขนี้ ค้างที่ 0 ตลอด)
+            "total_words": len(cat.lessons),
             "level": cat.level,
             "image": cat.image,
             "progress": progress_by_category.get(cat.id, 0),
@@ -95,7 +97,7 @@ def get_category(
         "id": category.id,
         "name": category.name,
         "description": category.description,
-        "total_words": category.total_words,
+        "total_words": len(category.lessons),
         "level": category.level,
         "image": category.image,
         "progress": progress_value,
@@ -128,7 +130,7 @@ def create_category(category_in: CategoryBase, db: Session = Depends(get_db)):
         "id": new_category.id,
         "name": new_category.name,
         "description": new_category.description,
-        "total_words": new_category.total_words,
+        "total_words": len(new_category.lessons),
         "level": new_category.level,
         "image": new_category.image,
         "progress": 0,

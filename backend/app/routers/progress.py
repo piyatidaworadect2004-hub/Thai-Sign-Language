@@ -10,16 +10,19 @@ router = APIRouter()
 
 
 def _build_overview(user_id: int, db: Session):
+    # ★ แก้: ใช้จำนวนคำศัพท์ "ที่เปิดใช้งานจริง" (is_active) นับสดจากตาราง Lesson
+    # แทน Category.total_words ที่แอดมินต้องกรอกเองและอาจไม่ตรงกับความเป็นจริง
+    # (นับเฉพาะ active เพราะคำที่ยังปิดใช้งานฝึกไม่ได้อยู่แล้ว ไม่ควรเอามาหารด้วย)
     results = (
         db.query(
             Category.id.label("category_id"),
             Category.name.label("category_name"),
-            Category.total_words.label("total_words"),
+            func.count(func.distinct(Lesson.id)).label("total_words"),
             func.count(func.distinct(PracticeLog.target_word)).label("words_practiced"),
             func.round(cast(func.avg(PracticeLog.correctness_percentage), Numeric), 2).label("avg_correctness"),
             func.max(PracticeLog.created_at).label("last_practiced_at"),
         )
-        .outerjoin(Lesson, Lesson.category_id == Category.id)
+        .outerjoin(Lesson, and_(Lesson.category_id == Category.id, Lesson.is_active == True))
         .outerjoin(
             PracticeLog,
             and_(
@@ -27,7 +30,7 @@ def _build_overview(user_id: int, db: Session):
                 cast(PracticeLog.lesson_id, Integer) == Lesson.id,
             ),
         )
-        .group_by(Category.id, Category.name, Category.total_words)
+        .group_by(Category.id, Category.name)
         .all()
     )
 
@@ -36,6 +39,9 @@ def _build_overview(user_id: int, db: Session):
         total_words = row.total_words or 0
         words_practiced = row.words_practiced or 0
 
+        # 🔑 CORE: ความคืบหน้า = สัดส่วนคำที่ "เคยฝึกอย่างน้อย 1 ครั้ง" ไม่ใช่คำที่ฝึกผ่าน
+        # ทำไม: วัดว่าเรียนครบหมวดหรือยัง (breadth) แยกจาก correctness_percentage ที่วัด
+        # คุณภาพของท่า (depth) — สองค่านี้ตั้งใจให้เป็นคนละมิติกัน ไม่ควรรวมเป็นตัวเดียว
         completion_percentage = 0
         if total_words > 0:
             completion_percentage = round(min(words_practiced / total_words * 100, 100), 2)
@@ -78,7 +84,17 @@ def get_progress_overview(
 
 
 @router.get("/user/{user_id}/detail")
-def get_progress_detail(user_id: int, db: Session = Depends(get_db)):
+def get_progress_detail(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """ดูของ user คนอื่นได้เฉพาะ admin เท่านั้น ดูของตัวเองได้เสมอ (เหมือน /overview ด้านบน)"""
+    if current_user.id != user_id and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="คุณไม่มีสิทธิ์ดูความคืบหน้าของผู้ใช้คนอื่น",
+        )
     results = (
         db.query(
             PracticeLog.id,

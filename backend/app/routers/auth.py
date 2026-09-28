@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
+from datetime import timedelta
 from typing import List
 
 from app.database import get_db
@@ -9,7 +10,7 @@ from app.models import User, LoginLog
 from app.schemas import UserOut, Token, UserCreate, UserLoginRequest
 from app.services.authen_service import (
     get_password_hash, verify_password, create_access_token,
-    SECRET_KEY, ALGORITHM
+    SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
 router = APIRouter(tags=["Authentication"])
@@ -84,7 +85,10 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token = create_access_token(data={"sub": user.username})
+    access_token = create_access_token(
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
 
     try:
         db.add(LoginLog(user_id=user.id, email=user.email))

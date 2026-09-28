@@ -199,6 +199,8 @@ def predict(data: RealtimePredictRequest):
             "is_correct": False,
         }
 
+    # 🔑 CORE: แปลง DTW score เป็น % — สูตรเดียวกับ practice_compare.py (ดูเหตุผลเต็มที่นั่น)
+    # ซ้ำกันเพราะ endpoint นี้ใช้ตอน real-time predict ระหว่างฝึก ส่วนอีกจุดใช้ตอนบันทึกผลจริง
     max_expected_score = result["threshold"] * 2
     correctness_percentage = max(0.0, 100.0 * (1 - result["best_score"] / max_expected_score))
     confidence = correctness_percentage / 100.0
