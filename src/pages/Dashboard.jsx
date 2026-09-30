@@ -151,6 +151,43 @@ function HistoryChart({ items }) {
     );
 }
 
+// สีขอบบน/ไอคอนของการ์ดหมวดหมู่ วนตามลำดับ
+const CATEGORY_ACCENTS = [
+    { bar: "border-t-orange-400", icon: "bg-orange-100 text-orange-600" },
+    { bar: "border-t-purple-400", icon: "bg-purple-100 text-purple-600" },
+    { bar: "border-t-blue-400", icon: "bg-blue-100 text-blue-600" },
+    { bar: "border-t-green-400", icon: "bg-green-100 text-green-600" },
+    { bar: "border-t-pink-400", icon: "bg-pink-100 text-pink-600" },
+];
+
+function HeroRing({ percent, size = 96, stroke = 8 }) {
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+
+    return (
+        <div className="relative shrink-0" style={{ width: size, height: size }}>
+            <svg width={size} height={size} className="-rotate-90">
+                <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} className="stroke-white/20" />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference * (1 - clamped / 100)}
+                    className="stroke-amber-400 transition-all duration-700 ease-out"
+                />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-xl font-extrabold text-white">
+                {clamped}%
+            </span>
+        </div>
+    );
+}
+
 export default function Dashboard() {
     const [progressData, setProgressData] = useState([]);
     const [stats, setStats] = useState({ totalPracticed: 0, avgConfidence: 0 });
@@ -158,6 +195,7 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [openTables, setOpenTables] = useState({});
     const navigate = useNavigate();
+    const username = localStorage.getItem("username");
 
     useEffect(() => {
         async function fetchProgress() {
@@ -230,181 +268,205 @@ export default function Dashboard() {
         <div className="min-h-screen bg-sky-100">
             <Navbar />
 
-            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
-                {/* ส่วนหัว */}
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-                    <div>
-                        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-1">แดชบอร์ดความคืบหน้า</h1>
-                        <p className="text-gray-600">ติดตามผลการฝึกซ้อมภาษามือของคุณ</p>
+            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 space-y-10">
+                {/* Hero: ทักทาย + สรุปภาพรวม */}
+                <section className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-3xl shadow-md p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-6">
+                    <div className="flex-1 text-white">
+                        <span className="inline-flex items-center gap-1.5 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold">
+                            📚 ฝึกไปแล้ว {stats.totalPracticed} ครั้ง
+                        </span>
+                        <h1 className="text-3xl sm:text-4xl font-bold mt-3">
+                            สวัสดี{username ? `, ${username}` : ""}
+                        </h1>
+                        <p className="text-blue-100 text-sm mt-2 max-w-md">
+                            {stats.totalPracticed > 0
+                                ? `คุณฝึกไปแล้ว ${stats.totalPracticed} ครั้ง ความใกล้เคียงของท่าเฉลี่ยอยู่ที่ ${stats.avgConfidence}% ฝึกต่อเพื่อพัฒนาทักษะให้ดียิ่งขึ้น`
+                                : "ยังไม่มีประวัติการฝึกซ้อม เริ่มต้นฝึกคำแรกกันเลย!"}
+                        </p>
+                        <button
+                            onClick={() => navigate("/lessons")}
+                            className="mt-5 bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition"
+                        >
+                            ฝึกต่อเลย →
+                        </button>
                     </div>
-                    <button
-                        onClick={() => navigate("/lessons")}
-                        className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:bg-blue-700 transition self-start sm:self-auto"
-                    >
-                        + ไปเลือกบทเรียนฝึกซ้อม
-                    </button>
-                </div>
 
-                {/* สถิติภาพรวม */}
-                <div className="grid grid-cols-2 gap-4 mb-6 sm:max-w-md">
-                    <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs text-gray-500">ฝึกซ้อมไปแล้ว</p>
-                            <p className="text-2xl font-extrabold text-blue-600 mt-1">
-                                {stats.totalPracticed} <span className="text-sm font-medium text-gray-400">ครั้ง</span>
-                            </p>
-                        </div>
-                        <div className="bg-sky-100 w-10 h-10 rounded-xl flex items-center justify-center text-lg">📚</div>
+                    <div className="self-center sm:self-auto bg-white/10 rounded-2xl px-6 py-5 flex flex-col items-center gap-2">
+                        <HeroRing percent={stats.avgConfidence} />
+                        <p className="text-xs text-blue-100">ความใกล้เคียงเฉลี่ย</p>
                     </div>
-                    <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs text-gray-500">ความแม่นยำเฉลี่ย</p>
-                            <p className="text-2xl font-extrabold text-green-600 mt-1">{stats.avgConfidence}%</p>
-                        </div>
-                        <div className="bg-green-100 w-10 h-10 rounded-xl flex items-center justify-center text-lg">🎯</div>
-                    </div>
-                </div>
+                </section>
 
                 {/* ความคืบหน้าแยกตามหมวดหมู่ */}
                 {categoryOverview.length > 0 && (
-                    <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
+                    <section>
                         <h2 className="text-xl font-bold text-gray-800">ความคืบหน้าแยกตามหมวดหมู่</h2>
-                        <p className="text-sm text-gray-500 mb-5">แสดงเฉพาะหมวดหมู่ที่เริ่มฝึกแล้ว</p>
+                        <p className="text-sm text-gray-500 mb-4">แสดงเฉพาะหมวดหมู่ที่เริ่มฝึกแล้ว</p>
 
                         {startedCategories.length === 0 ? (
-                            <p className="text-sm text-gray-400">ยังไม่ได้เริ่มฝึกหมวดหมู่ไหนเลย</p>
+                            <div className="bg-white rounded-2xl shadow-sm p-6 text-sm text-gray-400">
+                                ยังไม่ได้เริ่มฝึกหมวดหมู่ไหนเลย
+                            </div>
                         ) : (
-                            <div className="space-y-5">
-                                {startedCategories.map((cat) => (
-                                    <div key={cat.category_id}>
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <span className="font-semibold text-gray-700">{cat.category_name}</span>
-                                            <span className="text-sm font-bold text-gray-700">{cat.completion_percentage}%</span>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {startedCategories.map((cat, idx) => {
+                                    const accent = CATEGORY_ACCENTS[idx % CATEGORY_ACCENTS.length];
+                                    return (
+                                        <div
+                                            key={cat.category_id}
+                                            className={`bg-white rounded-2xl shadow-sm p-5 border-t-4 ${accent.bar}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3 mb-3">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <span className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center font-bold ${accent.icon}`}>
+                                                        {cat.category_name?.charAt(0)}
+                                                    </span>
+                                                    <span className="font-semibold text-gray-800 truncate">{cat.category_name}</span>
+                                                </div>
+                                                <span className="text-sm font-bold text-green-600">{cat.completion_percentage}%</span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                                <div
+                                                    className="h-2.5 rounded-full bg-green-500 transition-all"
+                                                    style={{ width: `${Math.min(cat.completion_percentage, 100)}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between mt-2 text-xs">
+                                                <span className="text-gray-400">
+                                                    ฝึกไปแล้ว {cat.words_practiced} / {cat.total_words} คำ
+                                                </span>
+                                                <button
+                                                    onClick={() =>
+                                                        navigate("/lessons", {
+                                                            state: { categoryId: cat.category_id, categoryTitle: cat.category_name },
+                                                        })
+                                                    }
+                                                    className="text-blue-600 font-semibold hover:underline"
+                                                >
+                                                    ฝึกต่อ →
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden mb-1">
-                                            <div
-                                                className="h-2.5 rounded-full bg-blue-500 transition-all"
-                                                style={{ width: `${Math.min(cat.completion_percentage, 100)}%` }}
-                                            />
-                                        </div>
-                                        <p className="text-xs text-gray-400">
-                                            ฝึกไปแล้ว {cat.words_practiced} / {cat.total_words} คำ
-                                        </p>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
 
                         {notStartedCount > 0 && (
-                            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 bg-sky-50 border border-sky-100 rounded-xl px-4 py-3 text-sm text-gray-600">
-                                <span>ยังมีอีก {notStartedCount} หมวดหมู่ที่ยังไม่ได้เริ่มฝึก</span>
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 bg-white border border-sky-100 rounded-xl px-4 py-3 text-sm text-gray-600">
+                                <span>ⓘ ยังมีอีก {notStartedCount} หมวดหมู่ที่ยังไม่ได้เริ่มฝึก</span>
                                 <button onClick={() => navigate("/lessons")} className="text-blue-600 font-semibold hover:underline">
                                     ไปเลือกบทเรียน →
                                 </button>
                             </div>
                         )}
-                    </div>
+                    </section>
                 )}
 
                 {/* ประวัติการฝึกซ้อมล่าสุด */}
-                <h2 className="text-xl font-bold text-gray-800">ประวัติการฝึกซ้อมล่าสุด</h2>
-                <p className="text-sm text-gray-500 mb-4">ความใกล้เคียงของท่าในแต่ละครั้งที่ฝึก แยกตามหมวดหมู่</p>
+                <section>
+                    <h2 className="text-xl font-bold text-gray-800">ประวัติการฝึกซ้อมล่าสุด</h2>
+                    <p className="text-sm text-gray-500 mb-4">ความใกล้เคียงของท่าในแต่ละครั้งที่ฝึก แยกตามหมวดหมู่</p>
 
-                {progressData.length === 0 ? (
-                    <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-gray-400">
-                        ยังไม่มีประวัติการฝึกซ้อม เริ่มต้นฝึกคำแรกกันเลย!
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        {groupedHistory.map((group) => {
-                            const latest = group.items[0];
-                            const wordCount = new Set(group.items.map((i) => i.lesson?.word)).size;
-                            const isOpen = !!openTables[group.category_name];
+                    {progressData.length === 0 ? (
+                        <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-gray-400">
+                            ยังไม่มีประวัติการฝึกซ้อม เริ่มต้นฝึกคำแรกกันเลย!
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {groupedHistory.map((group) => {
+                                    const latest = group.items[0];
+                                    const wordCount = new Set(group.items.map((i) => i.lesson?.word)).size;
+                                    const isOpen = !!openTables[group.category_name];
 
-                            return (
-                                <div key={group.category_name} className="bg-white rounded-2xl shadow-sm p-6">
-                                    <div className="flex items-start justify-between gap-3 mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-sky-100 w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0">📖</div>
-                                            <div>
-                                                <h3 className="font-bold text-gray-800">{group.category_name}</h3>
-                                                <p className="text-xs text-gray-400">
-                                                    ฝึก {group.items.length} ครั้ง · {wordCount} คำ
-                                                </p>
+                                    return (
+                                        // เปิดตารางแล้วขยายเต็มแถว ตารางจะได้ไม่เบียดในครึ่งจอ
+                                        <div
+                                            key={group.category_name}
+                                            className={`bg-white rounded-2xl shadow-sm p-5 ${isOpen ? "md:col-span-2" : ""}`}
+                                        >
+                                            <div className="flex items-start justify-between gap-3 mb-3">
+                                                <div className="min-w-0">
+                                                    <h3 className="font-bold text-gray-800 truncate">{group.category_name}</h3>
+                                                    <p className="text-xs text-gray-400">
+                                                        ฝึก {group.items.length} ครั้ง · {wordCount} คำ
+                                                    </p>
+                                                </div>
+                                                <span
+                                                    className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${
+                                                        latest.is_correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                                    }`}
+                                                >
+                                                    ล่าสุด {toPercent(latest.confidence)}%
+                                                </span>
                                             </div>
-                                        </div>
-                                        <span
-                                            className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${
-                                                latest.is_correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                                            }`}
-                                        >
-                                            ล่าสุด {toPercent(latest.confidence)}%
-                                        </span>
-                                    </div>
 
-                                    <HistoryChart items={group.items} />
+                                            <HistoryChart items={group.items} />
 
-                                    <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
-                                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                                            <span className="flex items-center gap-1.5">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-green-600" /> ผ่าน
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-red-600" /> ยังไม่ผ่าน
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <span className="w-4 border-t-2 border-dashed border-gray-400" /> เกณฑ์ผ่าน {PASS_MARK}%
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={() => setOpenTables((prev) => ({ ...prev, [group.category_name]: !isOpen }))}
-                                            className="text-sm text-blue-600 font-semibold hover:underline"
-                                        >
-                                            {isOpen ? "ซ่อนรายการ ↑" : `ดูประวัติทั้งหมด ${group.items.length} ครั้ง →`}
-                                        </button>
-                                    </div>
+                                            <button
+                                                onClick={() => setOpenTables((prev) => ({ ...prev, [group.category_name]: !isOpen }))}
+                                                className="mt-2 text-sm text-blue-600 font-semibold hover:underline"
+                                            >
+                                                {isOpen ? "ซ่อนรายการ ↑" : `ดูประวัติทั้งหมด ${group.items.length} รายการ →`}
+                                            </button>
 
-                                    {isOpen && (
-                                        <div className="overflow-x-auto mt-4">
-                                            <table className="w-full text-left border-collapse">
-                                                <thead>
-                                                    <tr className="border-b border-gray-100 text-gray-400 text-sm">
-                                                        <th className="py-3 px-4">คำศัพท์</th>
-                                                        <th className="py-3 px-4">ความใกล้เคียงของท่า</th>
-                                                        <th className="py-3 px-4">ผล</th>
-                                                        <th className="py-3 px-4">เวลาที่ฝึก</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {group.items.map((item, index) => (
-                                                        <tr key={index} className="border-b border-gray-50 hover:bg-sky-50 transition">
-                                                            <td className="py-3 px-4 font-bold text-gray-800">
-                                                                {item.lesson?.word || `บทเรียนที่ ${item.lesson_id}`}
-                                                            </td>
-                                                            <td className="py-3 px-4 text-gray-700">{toPercent(item.confidence)}%</td>
-                                                            <td className="py-3 px-4">
-                                                                <span
-                                                                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                                                        item.is_correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                                                                    }`}
-                                                                >
-                                                                    {item.is_correct ? "✅ ผ่าน" : "❌ ยังไม่ผ่าน"}
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-3 px-4 text-gray-500 text-sm">
-                                                                {new Date(item.created_at || Date.now()).toLocaleString("th-TH")}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                            {isOpen && (
+                                                <div className="overflow-x-auto mt-4">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead>
+                                                            <tr className="border-b border-gray-100 text-gray-400 text-sm">
+                                                                <th className="py-3 px-4">คำศัพท์</th>
+                                                                <th className="py-3 px-4">ความใกล้เคียงของท่า</th>
+                                                                <th className="py-3 px-4">ผล</th>
+                                                                <th className="py-3 px-4">เวลาที่ฝึก</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {group.items.map((item, index) => (
+                                                                <tr key={index} className="border-b border-gray-50 hover:bg-sky-50 transition">
+                                                                    <td className="py-3 px-4 font-bold text-gray-800">
+                                                                        {item.lesson?.word || `บทเรียนที่ ${item.lesson_id}`}
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-gray-700">{toPercent(item.confidence)}%</td>
+                                                                    <td className="py-3 px-4">
+                                                                        <span
+                                                                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                                                                item.is_correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                                                            }`}
+                                                                        >
+                                                                            {item.is_correct ? "✅ ผ่าน" : "❌ ยังไม่ผ่าน"}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-gray-500 text-sm">
+                                                                        {new Date(item.created_at || Date.now()).toLocaleString("th-TH")}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+                                    );
+                                })}
+                            </div>
+
+                            {/* legend ใช้ร่วมกันทุกกราฟ */}
+                            <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-gray-500">
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-green-600" /> ผ่าน (≥ {PASS_MARK}%)
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-600" /> ยังไม่ผ่าน (&lt; {PASS_MARK}%)
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-4 border-t-2 border-dashed border-gray-400" /> เกณฑ์ผ่าน
+                                </span>
+                            </div>
+                        </>
+                    )}
+                </section>
             </div>
         </div>
     );

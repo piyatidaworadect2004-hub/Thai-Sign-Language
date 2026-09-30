@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import Navbar from "../components/Navbar";
@@ -18,9 +18,8 @@ const PREDICT_WINDOW_MS = 3000;       // เก็บ buffer ย้อนหล�
 const BUFFER_PUSH_INTERVAL_MS = 100;  // ความถี่เก็บเฟรมเข้า buffer (~10fps พอสำหรับ DTW)
 
 const STEPS = [
-    { n: 1, label: "ดูตัวอย่าง" },
-    { n: 2, label: "ฝึกกับกล้อง" },
-    { n: 3, label: "ดูผลลัพธ์" },
+    { n: 1, label: "ดูตัวอย่างท่า" },
+    { n: 2, label: "ฝึกและดูผลลัพธ์" },
 ];
 
 export default function Practice() {
@@ -519,11 +518,13 @@ export default function Practice() {
         );
     }
 
+    const livePercent = Math.round(confidence * 100);
+
     return (
         <div className="min-h-screen bg-sky-100">
             <Navbar />
 
-            <div className="max-w-6xl mx-auto p-8">
+            <div className="max-w-4xl mx-auto p-4 sm:p-8">
                 <button
                     onClick={() => navigate(-1)}
                     className="bg-gray-500 text-white px-5 py-2 rounded-xl mb-6 hover:bg-gray-600 transition"
@@ -537,15 +538,15 @@ export default function Practice() {
                     คำที่กำลังฝึก: <span className="font-bold text-blue-600">{targetWord}</span>
                 </p>
 
-                {/* Step indicator */}
-                <div className="flex items-center justify-center gap-2 sm:gap-3 mt-6 mb-2">
+                {/* Step indicator — ขั้นแรกชิดซ้าย ขั้นสุดท้ายชิดขวา เส้นเชื่อมยืดเต็มพื้นที่ตรงกลาง */}
+                <div className="flex items-center gap-3 mt-6 mb-6">
                     {STEPS.map((s, idx) => (
-                        <div key={s.n} className="flex items-center gap-2 sm:gap-3">
-                            <div className="flex items-center gap-2">
+                        <Fragment key={s.n}>
+                            <div className="flex items-center gap-2 shrink-0">
                                 <span
                                     className={`flex items-center justify-center w-7 h-7 shrink-0 rounded-full text-sm font-bold ${
                                         step > s.n
-                                            ? "bg-green-500 text-white"
+                                            ? "bg-green-100 text-green-600"
                                             : step === s.n
                                             ? "bg-blue-600 text-white"
                                             : "bg-gray-200 text-gray-500"
@@ -554,22 +555,22 @@ export default function Practice() {
                                     {step > s.n ? "✓" : s.n}
                                 </span>
                                 <span
-                                    className={`text-sm font-semibold hidden sm:inline ${
-                                        step === s.n ? "text-blue-600" : "text-gray-500"
+                                    className={`text-sm font-semibold ${
+                                        step === s.n ? "text-gray-800" : "text-gray-500"
                                     }`}
                                 >
                                     {s.label}
                                 </span>
                             </div>
                             {idx < STEPS.length - 1 && (
-                                <div className={`w-8 sm:w-14 h-0.5 rounded ${step > s.n ? "bg-green-500" : "bg-gray-200"}`} />
+                                <div className={`flex-1 h-0.5 rounded ${step > s.n ? "bg-blue-600" : "bg-gray-300"}`} />
                             )}
-                        </div>
+                        </Fragment>
                     ))}
                 </div>
 
                 {/* ขั้นที่ 1: ดูตัวอย่าง */}
-                <div className={step === 1 ? "max-w-2xl mx-auto mt-4 space-y-6" : "hidden"}>
+                <div className={step === 1 ? "max-w-2xl mx-auto space-y-6" : "hidden"}>
                     {/* วิดีโอตัวอย่างท่า */}
                     <div className="bg-white rounded-2xl shadow-md p-5">
                         <h2 className="text-lg font-bold text-gray-800">วิดีโอตัวอย่างท่า</h2>
@@ -639,141 +640,169 @@ export default function Practice() {
                     </div>
                 </div>
 
-                {/* ขั้นที่ 2: ฝึกกับกล้อง */}
-                <div className={step === 2 ? "max-w-2xl mx-auto mt-4 space-y-6" : "hidden"}>
-                    <div className="bg-white rounded-2xl shadow-md p-5">
-                        <div className="flex flex-wrap gap-3 mb-3">
+                {/* ขั้นที่ 2: ฝึกกับกล้อง + ผลลัพธ์ในหน้าเดียวกัน */}
+                <div className={step === 2 ? "space-y-6" : "hidden"}>
+                    <div className="bg-white rounded-2xl shadow-md p-5 sm:p-6">
+                        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">ฝึกท่ากับกล้อง</h2>
+                                <p className="text-sm text-gray-500">
+                                    ทำท่ามือคำว่า "{targetWord}" ให้เหมือนตัวอย่างมากที่สุด
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setStep(1)}
+                                disabled={isRecording || isComparing}
+                                className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 border border-gray-200 rounded-xl p-1.5 pr-3 text-sm text-gray-600 transition"
+                            >
+                                <span className="flex items-center justify-center w-10 h-7 rounded-md bg-gray-800 text-white text-[10px]">
+                                    ▶
+                                </span>
+                                ดูวิดีโอตัวอย่างอีกครั้ง
+                            </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mb-4">
                             <button
                                 onClick={() => setPracticeStarted((prev) => !prev)}
                                 disabled={isRecording || isComparing}
-                                className={
+                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition disabled:opacity-50 ${
                                     practiceStarted
-                                        ? "border-2 border-red-400 text-red-600 bg-red-50 disabled:opacity-50 px-4 py-2 rounded-xl font-bold transition hover:bg-red-100"
-                                        : "border-2 border-blue-500 text-blue-600 disabled:opacity-50 px-4 py-2 rounded-xl font-bold transition hover:bg-blue-50"
-                                }
+                                        ? "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                        : "bg-blue-600 text-white hover:bg-blue-700"
+                                }`}
                             >
-                                {practiceStarted ? "🔴 ปิดกล้อง" : "🟢 เปิดกล้อง"}
-                            </button>
-                            <button
-                                onClick={startRecordingAndCompare}
-                                disabled={!cameraOn || isRecording || isComparing}
-                                className="bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-xl font-bold transition"
-                            >
-                                {isRecording
-                                    ? "🔴 กำลังอัด..."
-                                    : isComparing
-                                    ? "⏳ กำลังตรวจสอบ..."
-                                    : `🔴 เริ่มบันทึกท่า (${RECORD_DURATION_MS / 1000} วินาที)`}
+                                <span className={`w-2 h-2 rounded-full ${practiceStarted ? "bg-gray-400" : "bg-yellow-300"}`} />
+                                {practiceStarted ? "ปิดกล้อง" : "เปิดกล้อง"}
                             </button>
                         </div>
 
-                        <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
-                            {practiceStarted ? (
-                                <>
-                                    <video
-                                        ref={videoRef}
-                                        autoPlay
-                                        playsInline
-                                        className="w-full h-full object-cover"
-                                        style={{ transform: "scaleX(-1)" }}
-                                    />
-                                    <canvas
-                                        ref={canvasRef}
-                                        className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                                        style={{ transform: "scaleX(-1)" }}
-                                    />
-                                    {isRecording && (
-                                        <div className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold animate-pulse">
-                                            🔴 กำลังอัด...
+                        <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+                            <div>
+                                <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-900">
+                                    {practiceStarted ? (
+                                        <>
+                                            <video
+                                                ref={videoRef}
+                                                autoPlay
+                                                playsInline
+                                                className="w-full h-full object-cover"
+                                                style={{ transform: "scaleX(-1)" }}
+                                            />
+                                            <canvas
+                                                ref={canvasRef}
+                                                className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                                                style={{ transform: "scaleX(-1)" }}
+                                            />
+                                            {isRecording && (
+                                                <div className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold animate-pulse">
+                                                    🔴 กำลังอัด...
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-sm gap-2">
+                                            <span className="text-3xl">📹</span>
+                                            กล้องยังไม่ทำงาน — กดเปิดกล้องเพื่อเริ่มต้น
                                         </div>
                                     )}
-                                </>
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-sm gap-2">
-                                    <span className="text-3xl">📹</span>
-                                    กล้องยังไม่ทำงาน — กดเปิดกล้องเพื่อเริ่มต้น
                                 </div>
-                            )}
-                        </div>
 
-                        {/* min-height กันกล่องกระตุก — จองที่ไว้สำหรับสูงสุด 2 บรรทัดที่ขึ้น/หายสลับกันตอนตรวจจับมือ */}
-                        <div className="mt-2 space-y-1 min-h-[3rem]">
-                            {cameraOn && <p className="fade-in text-green-600 text-sm font-bold">กล้องทำงาน</p>}
-                            {handDetected && <p className="fade-in text-blue-600 text-sm font-bold">ตรวจพบมือ</p>}
-                            {!cameraOn && !practiceStarted && (
-                                <p className="fade-in text-gray-400 text-sm">กล้องไม่ทำงาน</p>
-                            )}
-                        </div>
+                                <div className="flex justify-center mt-4">
+                                    <button
+                                        onClick={startRecordingAndCompare}
+                                        disabled={!cameraOn || isRecording || isComparing}
+                                        className="flex items-center gap-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 disabled:opacity-50 disabled:hover:bg-red-50 px-5 py-2.5 rounded-full text-sm font-bold transition"
+                                    >
+                                        <span className={`w-2 h-2 rounded-full bg-red-500 ${isRecording ? "animate-pulse" : ""}`} />
+                                        {isRecording
+                                            ? "กำลังอัด..."
+                                            : isComparing
+                                            ? "กำลังตรวจสอบ..."
+                                            : "เริ่มฝึกท่าทาง"}
+                                    </button>
+                                </div>
 
-                        {/* แถบความใกล้เคียงของท่าแบบ real-time — เรนเดอร์ตลอด (ไม่ผูกกับ handDetected)
-                            กันกล่องกระตุกตอนมือหลุดจากเฟรมแล้วทั้งบล็อกหาย/โผล่ ค่าจะกลับไป 0% เองเพราะ
-                            confidence ถูก reset เป็น 0 อยู่แล้วตอนตรวจไม่พบมือ */}
-                        <div className="mt-2">
-                            <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm text-gray-600">ความใกล้เคียงของท่า</span>
-                                <span className="text-sm font-bold text-blue-600">
-                                    {Math.round(confidence * 100)}%
-                                </span>
+                                {/* min-height กันกล่องกระตุก — จองที่ไว้สำหรับสูงสุด 2 บรรทัดที่ขึ้น/หายสลับกันตอนตรวจจับมือ */}
+                                <div className="mt-2 space-y-1 min-h-[3rem]">
+                                    {cameraOn && <p className="fade-in text-green-600 text-sm font-bold">กล้องทำงาน</p>}
+                                    {handDetected && <p className="fade-in text-blue-600 text-sm font-bold">ตรวจพบมือ</p>}
+                                    {!cameraOn && !practiceStarted && (
+                                        <p className="fade-in text-gray-400 text-sm">กล้องไม่ทำงาน</p>
+                                    )}
+                                </div>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                                <div
-                                    className={`h-3 rounded-full transition-all duration-700 ease-out ${
-                                        prediction ? "bg-green-500" : "bg-orange-400"
-                                    }`}
-                                    style={{ width: `${Math.round(confidence * 100)}%` }}
+
+                            {/* วงแหวนความใกล้เคียงแบบ real-time — ค่ากลับเป็น 0% เองตอนมือหลุดเฟรม */}
+                            <div className="flex flex-col items-center gap-2 md:px-6">
+                                <ScoreRing
+                                    percent={livePercent}
+                                    colorClass={prediction ? "stroke-green-500" : "stroke-orange-400"}
                                 />
+                                <p className="text-xs text-gray-500">ความใกล้เคียงของท่า</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex justify-between">
-                        <button
-                            onClick={() => setStep(1)}
-                            className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-xl font-bold transition"
-                        >
-                            ← ย้อนกลับ
-                        </button>
-                        <button
-                            onClick={() => setStep(3)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition"
-                        >
-                            ถัดไป: ดูผลลัพธ์ →
-                        </button>
+                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                        <div className="flex-1 h-px bg-gray-300" />
+                        ผลลัพธ์จะแสดงที่นี่หลังบันทึกท่า
+                        <div className="flex-1 h-px bg-gray-300" />
                     </div>
-                </div>
 
-                {/* ขั้นที่ 3: ดูผลลัพธ์ */}
-                <div className={step === 3 ? "max-w-2xl mx-auto mt-4 space-y-6" : "hidden"}>
-                    <div className="bg-white rounded-2xl shadow-md p-5">
-                        <h2 className="text-lg font-bold text-gray-800 mb-1">
-                            ผลการตรวจสอบท่า (เทียบกับ Ground Truth)
-                        </h2>
+                    {compareError && (
+                        <div className="fade-in bg-red-50 border-2 border-red-300 rounded-2xl p-4">
+                            <p className="text-red-600 text-sm font-semibold">{compareError}</p>
+                        </div>
+                    )}
 
-                        {compareError && (
-                            <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 mb-3">
-                                <p className="text-red-600 text-sm font-semibold">{compareError}</p>
-                            </div>
-                        )}
+                    {isComparing && (
+                        <div className="fade-in bg-white rounded-2xl shadow-md p-6 text-center text-sm text-gray-500">
+                            ⏳ กำลังเทียบท่าของคุณกับ Ground Truth...
+                        </div>
+                    )}
 
-                        {compareResult ? (
-                            <div>
-                                <p className={`text-3xl font-bold mb-2 ${
-                                    compareResult.is_pass ? "text-green-600" : "text-red-600"
-                                }`}>
-                                    {compareResult.is_pass ? "✅ ผ่าน" : "❌ ยังไม่ผ่าน"}
-                                </p>
-                                <p className="text-sm">
-                                    ความใกล้เคียงของท่า: {compareResult.correctness_percentage}%
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    DTW Score: {compareResult.best_score} (threshold = {compareResult.threshold})
-                                </p>
-                                {compareResult.log_id ? (
+                    {compareResult && (
+                        <div
+                            className={`fade-in bg-white rounded-2xl shadow-md p-5 sm:p-6 border-2 ${
+                                compareResult.is_pass ? "border-green-200" : "border-red-200"
+                            }`}
+                        >
+                            <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+                                <ScoreRing
+                                    percent={compareResult.correctness_percentage}
+                                    size={110}
+                                    colorClass={compareResult.is_pass ? "stroke-green-500" : "stroke-red-500"}
+                                />
+                                <div className="flex-1">
+                                    <span
+                                        className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
+                                            compareResult.is_pass
+                                                ? "bg-green-100 text-green-700"
+                                                : "bg-red-100 text-red-600"
+                                        }`}
+                                    >
+                                        {compareResult.is_pass ? "✓ ผ่านเกณฑ์แล้ว" : "✕ ยังไม่ผ่านเกณฑ์"}
+                                    </span>
+                                    <h3 className="text-lg font-bold text-gray-800">
+                                        {compareResult.is_pass
+                                            ? "เยี่ยมมาก! ท่ามือของคุณใกล้เคียงกับ Ground Truth มาก"
+                                            : "ยังไม่ผ่าน ลองดูวิดีโอตัวอย่างแล้วบันทึกท่าอีกครั้ง"}
+                                    </h3>
+                                    {/* ผ่านเมื่อ best_score <= threshold ซึ่งตามสูตรแปลง % ใน backend ตรงกับ 50% พอดี */}
                                     <p className="text-xs text-gray-500 mt-1">
+                                        เกณฑ์ผ่านของคำนี้อยู่ที่ 50% ขึ้นไป · DTW Score: {compareResult.best_score} (threshold = {compareResult.threshold})
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-gray-100 mt-5 pt-4">
+                                {compareResult.log_id ? (
+                                    <p className="text-xs text-gray-500">
                                         บันทึกผลแล้ว (Log ID: {compareResult.log_id})
                                     </p>
                                 ) : (
-                                    <p className="text-xs text-orange-500 font-semibold mt-1">
+                                    <p className="text-xs text-orange-500 font-semibold">
                                         ⚠ ผลนี้ยังไม่ถูกบันทึก เนื่องจากคุณยังไม่ได้เข้าสู่ระบบ —{" "}
                                         <button
                                             onClick={() => navigate("/login")}
@@ -791,7 +820,6 @@ export default function Practice() {
                                             onClick={() => {
                                                 setCompareResult(null);
                                                 setCompareError("");
-                                                setStep(2);
                                             }}
                                             className="border-2 border-blue-500 text-blue-600 px-4 py-2 rounded-xl font-bold transition hover:bg-blue-50"
                                         >
@@ -816,21 +844,45 @@ export default function Practice() {
                                     </div>
                                 )}
                             </div>
-                        ) : (
-                            !handDetected && <p className="text-gray-400 text-sm">ยังไม่มีการบันทึกท่า</p>
-                        )}
-                    </div>
-
-                    <div className="flex justify-start">
-                        <button
-                            onClick={() => setStep(2)}
-                            className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-xl font-bold transition"
-                        >
-                            ← ย้อนกลับ
-                        </button>
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+function ScoreRing({ percent, size = 120, stroke = 10, colorClass }) {
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+
+    return (
+        <div className="relative shrink-0" style={{ width: size, height: size }}>
+            <svg width={size} height={size} className="-rotate-90">
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    strokeWidth={stroke}
+                    className="stroke-gray-200"
+                />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference * (1 - clamped / 100)}
+                    className={`${colorClass} transition-all duration-700 ease-out`}
+                />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-gray-800">
+                {Math.round(clamped)}%
+            </span>
         </div>
     );
 }

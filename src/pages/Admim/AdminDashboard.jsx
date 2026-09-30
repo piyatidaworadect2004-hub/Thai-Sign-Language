@@ -1,17 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
 
+// title/subtitle ใช้เป็นหัวข้อของเนื้อหาฝั่งขวาเมื่อเลือกเมนูนั้น
 const NAV_ITEMS = [
-  { key: 'overview', label: 'แดชบอร์ด', icon: '📊' },
-  { key: 'users', label: 'จัดการผู้ใช้', icon: '👥' },
-  { key: 'categories', label: 'จัดการบทเรียน', icon: '🗂️' },
-  { key: 'lessons', label: 'จัดการคำศัพท์', icon: '📚' },
-  { key: 'reports', label: 'ผลการประเมิน', icon: '📈' },
-  { key: 'login-logs', label: 'ประวัติ Login', icon: '🕒' },
+  { key: 'overview', label: 'Dashboard', icon: '▦', title: 'แดชบอร์ดผู้ดูแลระบบ', subtitle: 'ภาพรวมของระบบและกิจกรรมล่าสุดของผู้ใช้งาน' },
+  { key: 'users', label: 'จัดการผู้ใช้งาน', icon: '👥', title: 'จัดการผู้ใช้งาน', subtitle: 'ดูรายชื่อ เปลี่ยนสิทธิ์ และติดตามความคืบหน้าของผู้ใช้' },
+  { key: 'categories', label: 'จัดการบทเรียน', icon: '🗂️', title: 'จัดการบทเรียน', subtitle: 'เพิ่มและจัดการหมวดหมู่บทเรียนในระบบ' },
+  { key: 'lessons', label: 'จัดการคำศัพท์', icon: '📚', title: 'จัดการคำศัพท์', subtitle: 'เพิ่มคำศัพท์ภาษามือพร้อมวิดีโอตัวอย่าง และเปิด/ปิดการใช้งาน' },
+  { key: 'ground-truth', label: 'Ground Truth', icon: '🎯', title: 'Ground Truth', subtitle: 'สร้างท่าต้นแบบจากวิดีโอตัวอย่าง เพื่อใช้ให้คะแนนการฝึก' },
+  { key: 'reports', label: 'ผลการประเมิน', icon: '📈', title: 'ผลการประเมิน', subtitle: 'ความคืบหน้าและความแม่นยำของผู้ใช้แต่ละคน แยกตามหมวดหมู่' },
+  { key: 'summary', label: 'รายงาน', icon: '📄', title: 'รายงาน', subtitle: 'สรุปภาพรวมการใช้งานระบบรายเดือน' },
 ];
 
 const CATEGORY_BAR_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-pink-500', 'bg-indigo-500'];
+const SERIES_COMPLETION = '#2a78d6';
+const SERIES_CORRECTNESS = '#eb6834';
+
+const CARD = 'bg-white rounded-2xl shadow-sm border border-black/5';
+const TH = 'px-4 py-3 text-xs font-medium text-gray-400 whitespace-nowrap';
+const INPUT = 'w-full border border-gray-200 bg-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500';
+const BTN_PRIMARY = 'bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition disabled:bg-gray-300';
+const BTN_GHOST = 'bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-semibold transition';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -23,6 +32,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
+  const [reportUserId, setReportUserId] = useState('');
   const [loginLogs, setLoginLogs] = useState([]);
 
   // ★ เพิ่ม: state สำหรับฟอร์มเพิ่มบทเรียน (เดิมมีแค่ newLessonTitle อย่างเดียว)
@@ -124,7 +134,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setLoginLogs(data);
-        setActiveTab('login-logs');
+        setActiveTab('summary');
       } else {
         alert('ไม่สามารถดึงประวัติการเข้าสู่ระบบได้');
       }
@@ -422,6 +432,7 @@ export default function AdminDashboard() {
         const data = await res.json();
         setReports(data);
         setSelectedUserLabel(userLabel || `User #${userId}`);
+        setReportUserId(String(userId));
         setActiveTab('reports');
       } else {
         alert('ไม่สามารถดึงข้อมูลความคืบหน้าของ User นี้ได้');
@@ -470,6 +481,14 @@ export default function AdminDashboard() {
     }
   };
 
+  // หน้าแอดมินไม่มี Navbar แล้ว (ใช้ sidebar ของตัวเอง) — logout แบบเดียวกับ Navbar
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('role');
+    navigate('/login');
+  };
+
   // ★ เพิ่ม: หาชื่อหมวดหมู่จาก category_id เพื่อโชว์ในตาราง (แทนที่จะโชว์แค่เลข id)
   const getCategoryName = (categoryId) => {
     const cat = categories.find((c) => c.id === categoryId);
@@ -497,262 +516,365 @@ export default function AdminDashboard() {
     return matchesSearch && matchesCategory;
   });
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+  const adminName = localStorage.getItem('username') || 'ผู้ดูแลระบบ';
+  const activeNav = NAV_ITEMS.find((n) => n.key === activeTab) || NAV_ITEMS[0];
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">⚙️ ระบบจัดการหลังบ้าน (Admin Dashboard)</h1>
-        <p className="text-gray-600 mb-8">ยินดีต้อนรับเข้าสู่ระบบจัดการสำหรับผู้ดูแลระบบ</p>
+  const lessonCountByCategory = (categoryId) => lessons.filter((l) => l.category_id === categoryId).length;
+  const activeCountByCategory = (categoryId) => lessons.filter((l) => l.category_id === categoryId && l.is_active).length;
+  const topCategory = categories.reduce(
+    (best, c) => (!best || lessonCountByCategory(c.id) > lessonCountByCategory(best.id) ? c : best),
+    null
+  );
+  const adminCount = users.filter((u) => u.role === 'admin').length;
+  const recentUsers = [...users].sort((a, b) => b.id - a.id).slice(0, 5);
 
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          {/* Sidebar */}
-          <aside className="w-full md:w-56 shrink-0">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:sticky md:top-24">
-              <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">เมนูจัดการ</p>
-              <nav className="space-y-1">
-                {NAV_ITEMS.map((item) => (
+  // รายงาน: นับผู้ใช้ "ไม่ซ้ำ" ที่เข้าสู่ระบบในแต่ละเดือน จาก login log ที่ backend ส่งมา (ล่าสุด 200 รายการ)
+  const monthlyLogins = Object.values(
+    loginLogs.reduce((acc, log) => {
+      if (!log.login_time) return acc;
+      const d = new Date(log.login_time);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!acc[key]) acc[key] = { key, date: d, users: new Set() };
+      acc[key].users.add(log.user_id);
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .slice(-6);
+  const maxMonthly = Math.max(1, ...monthlyLogins.map((m) => m.users.size));
+
+  const startedReports = reports.filter((r) => r.words_practiced > 0);
+  const reportWordsPracticed = reports.reduce((sum, r) => sum + (r.words_practiced || 0), 0);
+  const reportAvgCorrectness = startedReports.length
+    ? Math.round(startedReports.reduce((sum, r) => sum + (r.correctness_percentage || 0), 0) / startedReports.length)
+    : 0;
+
+  const renderUserTable = (list) => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="text-left">
+            <th className={TH}>ผู้ใช้</th>
+            <th className={TH}>สิทธิ์</th>
+            <th className={`${TH} text-center`}>จัดการสิทธิ์</th>
+            <th className={`${TH} text-center`}>ความคืบหน้า</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map((u) => (
+            <tr key={u.id} className="border-t border-gray-100">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Avatar text={u.username || u.email} index={u.id} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-800 truncate">{u.username}</p>
+                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {u.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน'}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-center whitespace-nowrap">
+                {u.role !== 'admin' ? (
                   <button
-                    key={item.key}
-                    onClick={() => (item.key === 'login-logs' ? handleOpenLoginLogs() : setActiveTab(item.key))}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition text-left ${
-                      activeTab === item.key
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    onClick={() => handleChangeRole(u.id, u.role, 'admin')}
+                    className="px-3 py-1 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
                   >
-                    <span>{item.icon}</span>
-                    {item.label}
+                    ⭐ ตั้งเป็น Admin
                   </button>
-                ))}
-              </nav>
+                ) : (
+                  <button
+                    onClick={() => handleChangeRole(u.id, u.role, 'user', u.username)}
+                    className="px-3 py-1 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 transition"
+                  >
+                    ⬇ ลดเป็น User
+                  </button>
+                )}
+              </td>
+              <td className="px-4 py-3 text-center whitespace-nowrap">
+                <button
+                  onClick={() => handleViewUserProgress(u.id, u.email || u.username)}
+                  className="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition"
+                >
+                  ดูความคืบหน้า
+                </button>
+              </td>
+            </tr>
+          ))}
+          {list.length === 0 && (
+            <tr>
+              <td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-400">
+                ไม่พบผู้ใช้ที่ตรงกับคำค้นหา
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 md:flex">
+      {/* Sidebar — จอใหญ่เป็นแถบซ้ายสูงเต็มจอ จอเล็กเป็นแถบบนที่เลื่อนแนวนอนได้ */}
+      <aside className="bg-white text-gray-600 border-b md:border-b-0 md:border-r border-gray-200 md:w-60 md:shrink-0 md:h-screen md:sticky md:top-0 flex flex-col">
+        <div className="flex items-center gap-2.5 px-5 py-5">
+          <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm">✋</span>
+          <span className="font-bold text-gray-800">Thai Sign Admin</span>
+        </div>
+
+        <nav className="flex md:flex-col gap-1 px-3 pb-3 md:pb-0 overflow-x-auto md:overflow-visible md:flex-1">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => (item.key === 'summary' ? handleOpenLoginLogs() : setActiveTab(item.key))}
+              className={`shrink-0 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-left whitespace-nowrap ${
+                activeTab === item.key ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <span className="w-5 text-center">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex md:flex-col gap-1 border-t border-gray-200 mx-3 py-3">
+          <button
+            onClick={() => navigate('/home')}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 hover:text-gray-900 transition"
+          >
+            <span className="w-5 text-center">←</span>
+            กลับหน้าเว็บไซต์
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 transition"
+          >
+            <span className="w-5 text-center">⏻</span>
+            ออกจากระบบ
+          </button>
+        </div>
+      </aside>
+
+      {/* เนื้อหาหลัก — เปลี่ยนตามเมนูที่เลือกทางซ้าย */}
+      <main className="flex-1 min-w-0 px-4 sm:px-8 py-6 sm:py-8">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <header className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">{activeNav.title}</h1>
+                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[11px] font-semibold">
+                  Admin Panel
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">{activeNav.subtitle}</p>
             </div>
-          </aside>
+            <div className="flex items-center gap-2 bg-white rounded-full pl-1.5 pr-4 py-1.5 shadow-sm">
+              <span className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">
+                {adminName.charAt(0).toUpperCase()}
+              </span>
+              <span className="text-sm font-medium text-gray-700">{adminName}</span>
+            </div>
+          </header>
 
-          {/* เนื้อหาหลัก */}
-          <div className="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            {activeTab === 'overview' && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-1">แดชบอร์ดผู้ดูแลระบบ</h2>
-                <p className="text-gray-500 text-sm mb-6">ภาพรวมข้อมูลระบบ ณ ปัจจุบัน</p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-white p-5 rounded-xl border border-gray-200">
-                    <p className="text-xs text-gray-400 mb-1">👥 ผู้ใช้ทั้งหมด</p>
-                    <p className="text-2xl font-bold text-green-600">{users.length}</p>
-                  </div>
-                  <div className="bg-white p-5 rounded-xl border border-gray-200">
-                    <p className="text-xs text-gray-400 mb-1">🗂️ หมวดหมู่</p>
-                    <p className="text-2xl font-bold text-indigo-600">{categories.length}</p>
-                  </div>
-                  <div className="bg-white p-5 rounded-xl border border-gray-200">
-                    <p className="text-xs text-gray-400 mb-1">📚 คำศัพท์ทั้งหมด</p>
-                    <p className="text-2xl font-bold text-blue-600">{lessons.length}</p>
-                  </div>
-                  <div className="bg-white p-5 rounded-xl border border-gray-200">
-                    <p className="text-xs text-gray-400 mb-1">✅ เปิดใช้งานแล้ว</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {activeLessonPct}% <span className="text-sm text-gray-400 font-normal">({activeLessonCount}/{lessons.length})</span>
+          {/* ───────────── Dashboard ───────────── */}
+          {activeTab === 'overview' && (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard icon="👥" tint="bg-green-100" value={users.length} label="ผู้ใช้งานทั้งหมด" />
+                <StatCard icon="🗂️" tint="bg-indigo-50" value={categories.length} label="หมวดหมู่บทเรียน" />
+                <StatCard icon="📚" tint="bg-purple-50" value={lessons.length} label="คำศัพท์ทั้งหมด" />
+                <div className={`${CARD} p-5 flex items-center gap-4`}>
+                  <Ring percent={activeLessonPct} />
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{activeLessonPct}%</p>
+                    <p className="text-xs text-gray-500">
+                      คำศัพท์ที่เปิดใช้งาน ({activeLessonCount}/{lessons.length})
                     </p>
                   </div>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 border border-gray-200 rounded-xl p-5">
-                    <h3 className="font-bold text-gray-800 mb-4">จำนวนคำศัพท์ต่อหมวดหมู่</h3>
-                    <div className="space-y-3">
-                      {categories.map((cat, i) => {
-                        const count = lessons.filter((l) => l.category_id === cat.id).length;
-                        const pct = Math.round((count / maxLessonsPerCategory) * 100);
-                        return (
-                          <div key={cat.id}>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="text-gray-600">{cat.name}</span>
-                              <span className="text-gray-400">{count} คำ</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                              <div
-                                className={`h-2.5 rounded-full ${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]}`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className={`${CARD} p-5 lg:col-span-2`}>
+                  <h3 className="font-bold text-gray-800 mb-4">จำนวนคำศัพท์ต่อหมวดหมู่</h3>
+                  <div className="space-y-4">
+                    {categories.map((cat, i) => {
+                      const count = lessonCountByCategory(cat.id);
+                      const pct = Math.round((count / maxLessonsPerCategory) * 100);
+                      return (
+                        <div key={cat.id}>
+                          <div className="flex justify-between text-sm mb-1.5">
+                            <span className="text-gray-600">{cat.name}</span>
+                            <span className="font-semibold text-gray-700">{count} คำ</span>
                           </div>
-                        );
-                      })}
-                      {categories.length === 0 && (
-                        <p className="text-sm text-gray-400">ยังไม่มีหมวดหมู่ — ไปเพิ่มที่แท็บ "จัดการบทเรียน"</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="border border-gray-200 rounded-xl p-5">
-                    <h3 className="font-bold text-gray-800 mb-4">เข้าสู่ระบบล่าสุด</h3>
-                    {loginLogs.length === 0 ? (
-                      <p className="text-sm text-gray-400">ยังไม่มีข้อมูลการเข้าสู่ระบบ</p>
-                    ) : (
-                      <ul className="space-y-3">
-                        {loginLogs.slice(0, 6).map((log) => (
-                          <li key={log.id} className="text-sm">
-                            <p className="text-gray-700 font-medium truncate">{log.email}</p>
-                            <p className="text-gray-400 text-xs">{new Date(log.login_time).toLocaleString('th-TH')}</p>
-                          </li>
-                        ))}
-                      </ul>
+                          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-2 rounded-full ${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {categories.length === 0 && (
+                      <p className="text-sm text-gray-400">ยังไม่มีหมวดหมู่ — ไปเพิ่มที่เมนู "จัดการบทเรียน"</p>
                     )}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {activeTab === 'users' && (
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                  <h2 className="text-xl font-bold text-gray-800">👥 รายชื่อผู้ใช้งานในระบบ ({users.length})</h2>
-                  <input
-                    type="text"
-                    placeholder="ค้นหาผู้ใช้ (ชื่อ/อีเมล)..."
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">อีเมล / ชื่อผู้ใช้</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">สิทธิ์ (Role)</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">การจัดการสิทธิ์</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">ความคืบหน้า</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredUsers.map((u) => (
-                        <tr key={u.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.id}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.email || u.username}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
-                              {u.role}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                            {u.role !== 'admin' ? (
-                              <button
-                                onClick={() => handleChangeRole(u.id, u.role, 'admin')}
-                                className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg hover:bg-blue-200 transition text-xs font-medium"
-                              >
-                                ⭐ ตั้งเป็น Admin
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleChangeRole(u.id, u.role, 'user', u.email || u.username)}
-                                className="bg-red-100 text-red-600 px-3 py-1 rounded-lg hover:bg-red-200 transition text-xs font-medium"
-                              >
-                                ⬇ ลดเป็น User
-                              </button>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                            <button
-                              onClick={() => handleViewUserProgress(u.id, u.email || u.username)}
-                              className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg hover:bg-purple-200 transition text-xs font-medium"
-                            >
-                              ดูความคืบหน้า
-                            </button>
-                          </td>
-                        </tr>
+                <div className={`${CARD} p-5`}>
+                  <h3 className="font-bold text-gray-800 mb-4">กิจกรรมล่าสุด</h3>
+                  {loginLogs.length === 0 ? (
+                    <p className="text-sm text-gray-400">ยังไม่มีข้อมูลการเข้าสู่ระบบ</p>
+                  ) : (
+                    <ul className="space-y-4">
+                      {loginLogs.slice(0, 5).map((log) => (
+                        <li key={log.id} className="flex items-start gap-3">
+                          <Avatar text={log.email} index={log.user_id} small />
+                          <div className="min-w-0 text-sm">
+                            <p className="text-gray-700 truncate">
+                              <span className="font-semibold">{log.email}</span> เข้าสู่ระบบ
+                            </p>
+                            <p className="text-gray-400 text-xs">{new Date(log.login_time).toLocaleString('th-TH')}</p>
+                          </div>
+                        </li>
                       ))}
-                      {filteredUsers.length === 0 && (
-                        <tr>
-                          <td colSpan="5" className="px-6 py-8 text-center text-sm text-gray-500">
-                            ไม่พบผู้ใช้ที่ตรงกับคำค้นหา
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                    </ul>
+                  )}
                 </div>
               </div>
-            )}
 
-            {activeTab === 'categories' && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-4">🗂️ จัดการหมวดหมู่บทเรียน</h2>
+              <div className={`${CARD} p-5`}>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h3 className="font-bold text-gray-800">ผู้ใช้งานล่าสุด</h3>
+                    <p className="text-xs text-gray-400">5 บัญชีที่สมัครล่าสุด</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('users')}
+                    className="text-sm font-semibold text-blue-600 hover:underline"
+                  >
+                    ดูทั้งหมด →
+                  </button>
+                </div>
+                {renderUserTable(recentUsers)}
+              </div>
+            </>
+          )}
 
-                <div className="mb-6 bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* ───────────── จัดการผู้ใช้งาน ───────────── */}
+          {activeTab === 'users' && (
+            <div className={`${CARD} p-5`}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <h3 className="font-bold text-gray-800">รายชื่อผู้ใช้งาน ({users.length})</h3>
+                <SearchInput value={userSearch} onChange={setUserSearch} placeholder="ค้นหาชื่อหรืออีเมล..." />
+              </div>
+              {renderUserTable(filteredUsers)}
+            </div>
+          )}
+
+          {/* ───────────── จัดการบทเรียน (หมวดหมู่) ───────────── */}
+          {activeTab === 'categories' && (
+            <>
+              <div className={`${CARD} p-5 border-2 !border-blue-200`}>
+                <h3 className="font-bold text-gray-800 mb-4">＋ เพิ่มหมวดหมู่ใหม่</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field label="ชื่อหมวดหมู่">
                     <input
                       type="text"
-                      placeholder="ชื่อหมวดหมู่ใหม่... (เช่น ครอบครัว)"
+                      placeholder="เช่น ครอบครัว"
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={INPUT}
                     />
-                    <select
-                      value={newCategoryLevel}
-                      onChange={(e) => setNewCategoryLevel(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
+                  </Field>
+                  <Field label="ระดับความยาก">
+                    <select value={newCategoryLevel} onChange={(e) => setNewCategoryLevel(e.target.value)} className={INPUT}>
                       <option value="ง่าย">ง่าย</option>
                       <option value="ปานกลาง">ปานกลาง</option>
                       <option value="ยาก">ยาก</option>
                     </select>
-                  </div>
-
+                  </Field>
+                </div>
+                <Field label="คำอธิบายหมวดหมู่" className="mt-4">
                   <textarea
                     placeholder="คำอธิบายหมวดหมู่ (ไม่บังคับ)"
                     value={newCategoryDescription}
                     onChange={(e) => setNewCategoryDescription(e.target.value)}
                     rows={2}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={INPUT}
                   />
-
+                </Field>
+                <div className="flex justify-end gap-2 mt-4">
                   <button
-                    onClick={handleAddCategory}
-                    disabled={addingCategory}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition disabled:bg-gray-400"
+                    onClick={() => {
+                      setNewCategoryName('');
+                      setNewCategoryLevel('ง่าย');
+                      setNewCategoryDescription('');
+                    }}
+                    className={BTN_GHOST}
                   >
-                    {addingCategory ? 'กำลังเพิ่ม...' : '+ เพิ่มหมวดหมู่'}
+                    ล้าง
+                  </button>
+                  <button onClick={handleAddCategory} disabled={addingCategory} className={BTN_PRIMARY}>
+                    {addingCategory ? 'กำลังบันทึก...' : 'บันทึกหมวดหมู่'}
                   </button>
                 </div>
+              </div>
 
+              <div className={`${CARD} p-5`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                  <h3 className="font-semibold text-gray-700">หมวดหมู่ทั้งหมด ({categories.length})</h3>
-                  <input
-                    type="text"
-                    placeholder="ค้นหาหมวดหมู่..."
-                    value={categorySearch}
-                    onChange={(e) => setCategorySearch(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <h3 className="font-bold text-gray-800">หมวดหมู่ทั้งหมด ({categories.length})</h3>
+                  <SearchInput value={categorySearch} onChange={setCategorySearch} placeholder="ค้นหาหมวดหมู่..." />
                 </div>
-
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">หมวดหมู่</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">จำนวนคำศัพท์</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ระดับ</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">คำอธิบาย</th>
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left">
+                        <th className={TH}>หมวดหมู่</th>
+                        <th className={TH}>จำนวนคำศัพท์</th>
+                        <th className={TH}>ระดับ</th>
+                        <th className={TH}>เปิดใช้งาน</th>
+                        <th className={TH}>คำอธิบาย</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredCategories.map((cat) => (
-                        <tr key={cat.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cat.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {lessons.filter((l) => l.category_id === cat.id).length} คำ
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cat.level || '-'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{cat.description || '-'}</td>
-                        </tr>
-                      ))}
+                    <tbody>
+                      {filteredCategories.map((cat) => {
+                        const total = lessonCountByCategory(cat.id);
+                        const active = activeCountByCategory(cat.id);
+                        return (
+                          <tr key={cat.id} className="border-t border-gray-100">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <Avatar text={cat.name} index={cat.id} small />
+                                <span className="font-semibold text-gray-800">{cat.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{total} คำ</td>
+                            <td className="px-4 py-3"><LevelBadge level={cat.level} /></td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                  active > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {active}/{total} คำ
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{cat.description || '-'}</td>
+                          </tr>
+                        );
+                      })}
                       {filteredCategories.length === 0 && (
                         <tr>
-                          <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
+                          <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-400">
                             ยังไม่มีหมวดหมู่ — เพิ่มด้านบนได้เลย
                           </td>
                         </tr>
@@ -761,53 +883,51 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               </div>
-            )}
+            </>
+          )}
 
-            {activeTab === 'lessons' && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-4">📚 จัดการคำศัพท์ภาษามือ</h2>
-
-                {/* ★ แก้ใหม่: ฟอร์มเพิ่มบทเรียน แบ่ง 2 คอลัมน์ — ซ้ายกรอกข้อมูล ขวาลากไฟล์วิดีโอ */}
-                <div className="mb-6 bg-gray-50 border border-gray-200 rounded-xl p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
+          {/* ───────────── จัดการคำศัพท์ ───────────── */}
+          {activeTab === 'lessons' && (
+            <>
+              <div className={`${CARD} p-5 border-2 !border-blue-200`}>
+                <h3 className="font-bold text-gray-800 mb-4">＋ เพิ่มคำศัพท์ใหม่</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <Field label="คำศัพท์">
                       <input
                         type="text"
-                        placeholder="ชื่อคำศัพท์ใหม่... (เช่น สวัสดี)"
+                        placeholder="เช่น สวัสดี"
                         value={newLessonTitle}
                         onChange={(e) => setNewLessonTitle(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={INPUT}
                       />
-
-                      <select
-                        value={newLessonCategoryId}
-                        onChange={(e) => setNewLessonCategoryId(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
+                    </Field>
+                    <Field label="หมวดหมู่">
+                      <select value={newLessonCategoryId} onChange={(e) => setNewLessonCategoryId(e.target.value)} className={INPUT}>
                         <option value="">-- เลือกหมวดหมู่ --</option>
                         {categories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </option>
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
                         ))}
                       </select>
-
+                    </Field>
+                    <Field label="วิธีทำท่า">
                       <textarea
                         placeholder="คำอธิบาย (ไม่บังคับ)"
                         value={newLessonDescription}
                         onChange={(e) => setNewLessonDescription(e.target.value)}
                         rows={4}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={INPUT}
                       />
-                    </div>
+                    </Field>
+                  </div>
 
-                    {/* dropzone วิดีโอ */}
+                  <Field label="วิดีโอตัวอย่างท่า">
                     <div
                       onDragOver={(e) => { e.preventDefault(); setDragActiveNew(true); }}
                       onDragLeave={() => setDragActiveNew(false)}
                       onDrop={handleNewVideoDrop}
-                      className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-4 text-center transition min-h-[160px] ${
-                        dragActiveNew ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white'
+                      className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-4 text-center transition min-h-[220px] h-full ${
+                        dragActiveNew ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
                       }`}
                     >
                       {uploadingNewVideo ? (
@@ -820,12 +940,12 @@ export default function AdminDashboard() {
                         </>
                       ) : (
                         <>
-                          <span className="text-2xl">🎬</span>
+                          <span className="text-2xl text-gray-400">⬆</span>
                           <p className="text-sm text-gray-500">ลากไฟล์วิดีโอมาวางที่นี่</p>
                         </>
                       )}
 
-                      <label className="text-xs text-blue-600 hover:text-blue-700 underline cursor-pointer">
+                      <label className="text-xs text-blue-600 hover:underline cursor-pointer font-medium">
                         หรือเลือกไฟล์จากเครื่อง
                         <input
                           type="file"
@@ -841,68 +961,70 @@ export default function AdminDashboard() {
                         placeholder="หรือวาง Video URL ที่นี่"
                         value={newLessonVideoUrl}
                         onChange={(e) => setNewLessonVideoUrl(e.target.value)}
-                        className="w-full mt-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`${INPUT} mt-1 text-xs`}
                       />
                     </div>
-                  </div>
-
-                  <button
-                    onClick={handleAddLesson}
-                    disabled={addingLesson || uploadingNewVideo}
-                    className="mt-3 bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition disabled:bg-gray-400"
-                  >
-                    {addingLesson ? 'กำลังเพิ่ม...' : '+ เพิ่มคำศัพท์'}
-                  </button>
-                  <p className="text-xs text-gray-400 mt-2">
-                    * คำใหม่จะเริ่มต้นเป็น "ปิดใช้งาน" เสมอ ไปเปิดใช้งานที่ตารางด้านล่างหลัง AI ตรวจจับคำนี้ได้แล้ว
-                  </p>
+                  </Field>
                 </div>
 
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                  <p className="text-xs text-gray-400">
+                    * คำใหม่จะเริ่มเป็น "ปิดใช้งาน" เสมอ จนกว่าจะสร้าง Ground Truth หรือเปิดใช้งานเอง
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setNewLessonTitle('');
+                        setNewLessonCategoryId('');
+                        setNewLessonDescription('');
+                        setNewLessonVideoUrl('');
+                      }}
+                      className={BTN_GHOST}
+                    >
+                      ล้าง
+                    </button>
+                    <button onClick={handleAddLesson} disabled={addingLesson || uploadingNewVideo} className={BTN_PRIMARY}>
+                      {addingLesson ? 'กำลังบันทึก...' : 'บันทึกคำศัพท์'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`${CARD} p-5`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                  <h3 className="font-semibold text-gray-700">คำศัพท์ทั้งหมด ({lessons.length})</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h3 className="font-bold text-gray-800">คำศัพท์ทั้งหมด ({lessons.length})</h3>
                     <select
                       value={lessonCategoryFilter}
                       onChange={(e) => setLessonCategoryFilter(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`${INPUT} !w-auto !py-1.5 text-sm`}
                     >
                       <option value="">ทุกหมวดหมู่</option>
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
-                    <input
-                      type="text"
-                      placeholder="ค้นหาคำศัพท์..."
-                      value={lessonSearch}
-                      onChange={(e) => setLessonSearch(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
                   </div>
+                  <SearchInput value={lessonSearch} onChange={setLessonSearch} placeholder="ค้นหาคำศัพท์..." />
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อคำศัพท์</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">หมวดหมู่</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วิดีโอ</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">สถานะ</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">จัดการ</th>
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left">
+                        <th className={TH}>คำศัพท์</th>
+                        <th className={TH}>หมวดหมู่</th>
+                        <th className={TH}>วิดีโอ</th>
+                        <th className={`${TH} text-center`}>สถานะ</th>
+                        <th className={`${TH} text-center`}>จัดการ</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody>
                       {filteredLessons.map((lesson) => (
-                        <tr key={lesson.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lesson.id}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{lesson.title}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {getCategoryName(lesson.category_id)}
-                          </td>
-                          {/* ★ เพิ่มใหม่: แก้ไข video_url ของคำที่มีอยู่แล้ว */}
-                          <td className="px-6 py-4 text-sm text-gray-500">
+                        <tr key={lesson.id} className="border-t border-gray-100">
+                          <td className="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap">{lesson.title}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{getCategoryName(lesson.category_id)}</td>
+                          <td className="px-4 py-3 text-gray-500">
                             {editingVideoId === lesson.id ? (
                               <div className="flex items-center gap-2 flex-wrap">
                                 <input
@@ -911,9 +1033,9 @@ export default function AdminDashboard() {
                                   value={editingVideoUrl}
                                   onChange={(e) => setEditingVideoUrl(e.target.value)}
                                   placeholder="วาง Video URL ที่นี่"
-                                  className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className={`${INPUT} !w-40 !py-1 text-xs`}
                                 />
-                                <label className="text-xs text-blue-500 hover:text-blue-700 underline cursor-pointer">
+                                <label className="text-xs text-blue-600 hover:underline cursor-pointer">
                                   {uploadingEditVideoId === lesson.id ? '⏳ กำลังอัปโหลด...' : '📁 อัปโหลดไฟล์'}
                                   <input
                                     type="file"
@@ -923,35 +1045,25 @@ export default function AdminDashboard() {
                                     className="hidden"
                                   />
                                 </label>
-                                <button
-                                  onClick={() => saveVideoUrl(lesson.id)}
-                                  className="text-green-600 hover:text-green-800 text-xs font-semibold"
-                                >
+                                <button onClick={() => saveVideoUrl(lesson.id)} className="text-green-600 text-xs font-semibold">
                                   บันทึก
                                 </button>
-                                <button
-                                  onClick={cancelEditVideo}
-                                  className="text-gray-400 hover:text-gray-600 text-xs"
-                                >
+                                <button onClick={cancelEditVideo} className="text-gray-400 hover:text-gray-600 text-xs">
                                   ยกเลิก
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 whitespace-nowrap">
                                 <span className={lesson.video_url ? 'text-green-600 text-xs font-medium' : 'text-gray-400 text-xs'}>
                                   {lesson.video_url ? '✅ มีวิดีโอ' : '— ไม่มี'}
                                 </span>
-                                <button
-                                  onClick={() => startEditVideo(lesson)}
-                                  className="text-blue-500 hover:text-blue-700 text-xs underline"
-                                >
+                                <button onClick={() => startEditVideo(lesson)} className="text-blue-600 text-xs underline">
                                   แก้ไข
                                 </button>
                               </div>
                             )}
                           </td>
-                          {/* ★ เพิ่มใหม่: toggle is_active */}
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                          <td className="px-4 py-3 text-center whitespace-nowrap">
                             <button
                               onClick={() => handleToggleActive(lesson.id, lesson.is_active)}
                               className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
@@ -960,30 +1072,23 @@ export default function AdminDashboard() {
                                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                               }`}
                             >
-                              {lesson.is_active ? '✅ เปิดใช้งาน' : '⚪ ปิดใช้งาน'}
+                              {lesson.is_active ? 'พร้อมใช้งาน' : 'ปิดใช้งาน'}
                             </button>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
-                            <button
-                              onClick={() => handleBuildGroundTruth(lesson)}
-                              disabled={!lesson.video_url || buildingGtId === lesson.id}
-                              title={!lesson.video_url ? 'ต้องมี Video URL ก่อน' : 'ประมวลผลวิดีโอตัวอย่างเป็น Ground Truth ให้คำนี้'}
-                              className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-200 transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                            >
-                              {buildingGtId === lesson.id ? '⏳ กำลังสร้าง...' : '🎯 สร้าง Ground Truth'}
-                            </button>
+                          <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => handleDeleteLesson(lesson.id)}
-                              className="bg-red-100 text-red-600 px-3 py-1 rounded-lg hover:bg-red-200 transition"
+                              title="ลบคำศัพท์"
+                              className="w-8 h-8 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition"
                             >
-                              ลบ
+                              🗑
                             </button>
                           </td>
                         </tr>
                       ))}
                       {filteredLessons.length === 0 && (
                         <tr>
-                          <td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">
+                          <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-400">
                             ไม่พบคำศัพท์ที่ตรงกับเงื่อนไข
                           </td>
                         </tr>
@@ -992,39 +1097,152 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               </div>
-            )}
+            </>
+          )}
 
-            {activeTab === 'reports' && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-1">📈 ผลการประเมินและความคืบหน้า</h2>
-                <p className="text-gray-500 text-sm mb-4">
-                  {selectedUserLabel ? (
-                    <>ความคืบหน้าของ <span className="font-semibold text-gray-700">{selectedUserLabel}</span> แยกตามหมวดหมู่</>
-                  ) : (
-                    'เลือกผู้ใช้จากแท็บ "จัดการผู้ใช้" แล้วกด "ดูความคืบหน้า" เพื่อแสดงรายงานที่นี่'
-                  )}
-                </p>
+          {/* ───────────── Ground Truth ───────────── */}
+          {activeTab === 'ground-truth' && (
+            <>
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-600">
+                กด "สร้าง Ground Truth" เพื่อประมวลผลวิดีโอตัวอย่างของคำนั้นเป็นท่าต้นแบบที่ใช้ให้คะแนน
+                สร้างสำเร็จแล้วระบบจะเปิดใช้งานคำนั้นให้อัตโนมัติ (ต้องมีวิดีโอตัวอย่างก่อน)
+              </div>
 
-                {reports.length === 0 ? (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center text-sm text-gray-500">
-                    ยังไม่ได้เลือกผู้ใช้ หรือไม่มีข้อมูลความคืบหน้า
+              <div className={`${CARD} p-5`}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h3 className="font-bold text-gray-800">คำศัพท์ทั้งหมด ({lessons.length})</h3>
+                    <select
+                      value={lessonCategoryFilter}
+                      onChange={(e) => setLessonCategoryFilter(e.target.value)}
+                      className={`${INPUT} !w-auto !py-1.5 text-sm`}
+                    >
+                      <option value="">ทุกหมวดหมู่</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
-                ) : (
-                  <>
-                    {/* legend — 2 series ต้องมี legend เสมอ */}
-                    <div className="flex items-center gap-5 text-xs text-gray-500 mb-3">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#2a78d6' }} />
-                        ความคืบหน้า (% คำที่เคยฝึก)
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#eb6834' }} />
-                        ความแม่นยำเฉลี่ย (%)
-                      </span>
+                  <SearchInput value={lessonSearch} onChange={setLessonSearch} placeholder="ค้นหาคำศัพท์..." />
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left">
+                        <th className={TH}>คำศัพท์</th>
+                        <th className={TH}>หมวดหมู่</th>
+                        <th className={TH}>วิดีโอตัวอย่าง</th>
+                        <th className={TH}>สถานะ</th>
+                        <th className={`${TH} text-center`}>Ground Truth</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLessons.map((lesson) => (
+                        <tr key={lesson.id} className="border-t border-gray-100">
+                          <td className="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap">{lesson.title}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{getCategoryName(lesson.category_id)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={lesson.video_url ? 'text-green-600 text-xs font-medium' : 'text-gray-400 text-xs'}>
+                              {lesson.video_url ? '✅ มีวิดีโอ' : '— ไม่มี'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                lesson.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                              }`}
+                            >
+                              {lesson.is_active ? 'พร้อมใช้งาน' : 'ปิดใช้งาน'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center whitespace-nowrap">
+                            <button
+                              onClick={() => handleBuildGroundTruth(lesson)}
+                              disabled={!lesson.video_url || buildingGtId === lesson.id}
+                              title={!lesson.video_url ? 'ต้องมี Video URL ก่อน' : 'ประมวลผลวิดีโอตัวอย่างเป็น Ground Truth ให้คำนี้'}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            >
+                              {buildingGtId === lesson.id ? '⏳ กำลังสร้าง...' : '🎯 สร้าง Ground Truth'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredLessons.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-400">
+                            ไม่พบคำศัพท์ที่ตรงกับเงื่อนไข
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ───────────── ผลการประเมิน ───────────── */}
+          {activeTab === 'reports' && (
+            <>
+              <div className={`${CARD} p-5 flex flex-col sm:flex-row sm:items-center gap-3`}>
+                <label className="text-sm font-semibold text-gray-700 shrink-0">เลือกผู้ใช้</label>
+                <select
+                  value={reportUserId}
+                  onChange={(e) => {
+                    const u = users.find((x) => String(x.id) === e.target.value);
+                    if (u) handleViewUserProgress(u.id, u.email || u.username);
+                  }}
+                  className={`${INPUT} sm:max-w-sm`}
+                >
+                  <option value="">-- เลือกผู้ใช้เพื่อดูผลการประเมิน --</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.username} ({u.email})</option>
+                  ))}
+                </select>
+              </div>
+
+              {reports.length === 0 ? (
+                <div className={`${CARD} p-8 text-center text-sm text-gray-400`}>
+                  ยังไม่ได้เลือกผู้ใช้ หรือผู้ใช้นี้ยังไม่มีข้อมูลความคืบหน้า
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className={`${CARD} p-5`}>
+                      <p className="text-2xl font-bold text-gray-900">{startedReports.length}/{reports.length}</p>
+                      <p className="text-xs text-gray-500 mt-1">หมวดหมู่ที่เริ่มฝึกแล้ว</p>
+                    </div>
+                    <div className={`${CARD} p-5`}>
+                      <p className="text-2xl font-bold text-gray-900">{reportWordsPracticed}</p>
+                      <p className="text-xs text-gray-500 mt-1">คำศัพท์ที่เคยฝึก</p>
+                    </div>
+                    <div className={`${CARD} p-5`}>
+                      <p className="text-2xl font-bold text-gray-900">{reportAvgCorrectness}%</p>
+                      <p className="text-xs text-gray-500 mt-1">ความแม่นยำเฉลี่ย (เฉพาะหมวดที่ฝึกแล้ว)</p>
+                    </div>
+                  </div>
+
+                  <div className={`${CARD} p-5`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                      <h3 className="font-bold text-gray-800">
+                        ความคืบหน้าของ <span className="text-blue-600">{selectedUserLabel}</span> แยกตามหมวดหมู่
+                      </h3>
+                      {/* legend — 2 series ต้องมี legend เสมอ */}
+                      <div className="flex items-center gap-5 text-xs text-gray-500">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_COMPLETION }} />
+                          ความคืบหน้า (% คำที่เคยฝึก)
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_CORRECTNESS }} />
+                          ความแม่นยำเฉลี่ย (%)
+                        </span>
+                      </div>
                     </div>
 
                     {/* กราฟแท่งเทียบ 2 ตัวชี้วัดต่อหมวดหมู่ */}
-                    <div className="overflow-x-auto border border-gray-200 rounded-xl p-4 mb-4">
+                    <div className="overflow-x-auto mb-4">
                       <svg
                         viewBox={`0 0 560 ${28 + reports.length * 56 + 8}`}
                         role="img"
@@ -1032,7 +1250,6 @@ export default function AdminDashboard() {
                         className="w-full"
                         style={{ minWidth: 480 }}
                       >
-                        {/* gridlines + tick labels (0/25/50/75/100%) */}
                         {[0, 25, 50, 75, 100].map((pct) => {
                           const x = 180 + (pct / 100) * 340;
                           const bottomY = 28 + reports.length * 56;
@@ -1067,24 +1284,14 @@ export default function AdminDashboard() {
                               <title>
                                 {r.category_name}: ความคืบหน้า {completion}%, ความแม่นยำเฉลี่ย {correctness}%
                               </title>
-
-                              <text
-                                x={leftX - 10}
-                                y={groupCenter}
-                                textAnchor="end"
-                                dominantBaseline="middle"
-                                fontSize="12"
-                                fill="#374151"
-                              >
+                              <text x={leftX - 10} y={groupCenter} textAnchor="end" dominantBaseline="middle" fontSize="12" fill="#374151">
                                 {r.category_name}
                               </text>
-
-                              <path d={roundedBar(completion, bar1Y)} fill="#2a78d6" />
+                              <path d={roundedBar(completion, bar1Y)} fill={SERIES_COMPLETION} />
                               <text x={leftX + (completion / 100) * plotW + 6} y={bar1Y + 7} dominantBaseline="middle" fontSize="10" fill="#52514e">
                                 {completion}%
                               </text>
-
-                              <path d={roundedBar(correctness, bar2Y)} fill="#eb6834" />
+                              <path d={roundedBar(correctness, bar2Y)} fill={SERIES_CORRECTNESS} />
                               <text x={leftX + (correctness / 100) * plotW + 6} y={bar2Y + 7} dominantBaseline="middle" fontSize="10" fill="#52514e">
                                 {correctness}%
                               </text>
@@ -1094,62 +1301,127 @@ export default function AdminDashboard() {
                       </svg>
                     </div>
 
-                    {/* table view — ตัวเลขจริงครบทุกหมวด (accessibility: ไม่ต้องพึ่งกราฟอย่างเดียว) */}
+                    {/* table view — ตัวเลขจริงครบทุกหมวด (ไม่ต้องพึ่งกราฟอย่างเดียว) */}
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-sm">
                         <thead>
-                          <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                            <th className="py-2 pr-4 font-medium">หมวดหมู่</th>
-                            <th className="py-2 pr-4 font-medium">ฝึกไปแล้ว</th>
-                            <th className="py-2 pr-4 font-medium">ความคืบหน้า</th>
-                            <th className="py-2 font-medium">ความแม่นยำเฉลี่ย</th>
+                          <tr className="text-left">
+                            <th className={TH}>หมวดหมู่</th>
+                            <th className={TH}>ฝึกไปแล้ว</th>
+                            <th className={TH}>ความคืบหน้า</th>
+                            <th className={TH}>ความแม่นยำเฉลี่ย</th>
                           </tr>
                         </thead>
                         <tbody>
                           {reports.map((r) => (
-                            <tr key={r.category_id} className="border-b border-gray-50">
-                              <td className="py-2 pr-4 text-gray-700">{r.category_name}</td>
-                              <td className="py-2 pr-4 text-gray-500">{r.words_practiced} / {r.total_words} คำ</td>
-                              <td className="py-2 pr-4 text-gray-500">{r.completion_percentage}%</td>
-                              <td className="py-2 text-gray-500">{r.correctness_percentage}%</td>
+                            <tr key={r.category_id} className="border-t border-gray-100">
+                              <td className="px-4 py-3 text-gray-700">{r.category_name}</td>
+                              <td className="px-4 py-3 text-gray-500">{r.words_practiced} / {r.total_words} คำ</td>
+                              <td className="px-4 py-3 text-gray-500">{r.completion_percentage}%</td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                    r.words_practiced === 0
+                                      ? 'bg-gray-100 text-gray-500'
+                                      : r.correctness_percentage >= 50
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-red-50 text-red-600'
+                                  }`}
+                                >
+                                  {r.correctness_percentage}%
+                                </span>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </>
-                )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* ───────────── รายงาน ───────────── */}
+          {activeTab === 'summary' && (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className={`${CARD} p-5`}>
+                  <h3 className="font-bold text-gray-800">ผู้ใช้ที่เข้าสู่ระบบรายเดือน</h3>
+                  <p className="text-xs text-gray-400 mb-4">นับผู้ใช้ไม่ซ้ำ จากประวัติเข้าสู่ระบบล่าสุด {loginLogs.length} รายการ</p>
+                  {monthlyLogins.length === 0 ? (
+                    <p className="text-sm text-gray-400">ยังไม่มีข้อมูลการเข้าสู่ระบบ</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {monthlyLogins.map((m, i) => (
+                        <div key={m.key}>
+                          <div className="flex justify-between text-sm mb-1.5">
+                            <span className="text-gray-600">
+                              {m.date.toLocaleDateString('th-TH', { month: 'short', year: 'numeric' })}
+                            </span>
+                            <span className="font-semibold text-gray-800">{m.users.size} คน</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-2 rounded-full ${i === monthlyLogins.length - 1 ? 'bg-blue-600' : 'bg-blue-300'}`}
+                              style={{ width: `${Math.round((m.users.size / maxMonthly) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className={`${CARD} p-5`}>
+                  <h3 className="font-bold text-gray-800 mb-2">สรุปภาพรวม</h3>
+                  <dl className="divide-y divide-gray-100 text-sm">
+                    {[
+                      ['ผู้ใช้งานทั้งหมด', `${users.length} คน`],
+                      ['ผู้ดูแลระบบ', `${adminCount} คน`],
+                      ['หมวดหมู่บทเรียน', `${categories.length} หมวด`],
+                      ['คำศัพท์ที่เปิดใช้งาน', `${activeLessonCount}/${lessons.length} คำ (${activeLessonPct}%)`],
+                      ['หมวดหมู่ที่มีคำศัพท์มากที่สุด', topCategory ? `${topCategory.name} (${lessonCountByCategory(topCategory.id)} คำ)` : '-'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-4 py-3">
+                        <dt className="text-gray-500">{label}</dt>
+                        <dd className="font-semibold text-gray-800 text-right">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
               </div>
-            )}
 
-            {activeTab === 'login-logs' && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-4">🕒 ประวัติการเข้าสู่ระบบ (Login History)</h2>
-                <p className="text-gray-500 text-sm mb-4">บันทึกข้อมูลว่ามีบัญชีผู้ใช้งานใดบ้างที่ทำการ Login เข้ามาในระบบ</p>
-
+              <div className={`${CARD} p-5`}>
+                <h3 className="font-bold text-gray-800 mb-3">ประวัติการเข้าสู่ระบบ</h3>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID ผู้ใช้</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">อีเมล</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">เวลาที่เข้าสู่ระบบ</th>
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left">
+                        <th className={TH}>ผู้ใช้</th>
+                        <th className={TH}>ID ผู้ใช้</th>
+                        <th className={TH}>เวลาที่เข้าสู่ระบบ</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody>
                       {loginLogs.length > 0 ? (
                         loginLogs.map((log) => (
-                          <tr key={log.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.user_id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{log.email}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <tr key={log.id} className="border-t border-gray-100">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <Avatar text={log.email} index={log.user_id} small />
+                                <span className="font-medium text-gray-800">{log.email}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{log.user_id}</td>
+                            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                               {new Date(log.login_time).toLocaleString('th-TH')}
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="3" className="px-6 py-8 text-center text-sm text-gray-500">
+                          <td colSpan="3" className="px-4 py-8 text-center text-sm text-gray-400">
                             ไม่มีข้อมูลประวัติการเข้าสู่ระบบ
                           </td>
                         </tr>
@@ -1158,10 +1430,99 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
-      </div>
+      </main>
+    </div>
+  );
+}
+
+const AVATAR_TINTS = [
+  'bg-green-100 text-green-700',
+  'bg-orange-50 text-orange-700',
+  'bg-purple-50 text-purple-700',
+  'bg-pink-50 text-pink-700',
+  'bg-sky-50 text-sky-700',
+];
+
+function Avatar({ text, index = 0, small = false }) {
+  const tint = AVATAR_TINTS[Math.abs(Number(index) || 0) % AVATAR_TINTS.length];
+  return (
+    <span
+      className={`shrink-0 rounded-full flex items-center justify-center font-bold ${tint} ${
+        small ? 'w-8 h-8 text-xs' : 'w-9 h-9 text-sm'
+      }`}
+    >
+      {(text || '?').slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
+function StatCard({ icon, tint, value, label }) {
+  return (
+    <div className={`${CARD} p-5`}>
+      <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${tint}`}>{icon}</span>
+      <p className="text-2xl font-bold text-gray-900 mt-3">{value}</p>
+      <p className="text-xs text-gray-500">{label}</p>
+    </div>
+  );
+}
+
+function Ring({ percent, size = 56, stroke = 6 }) {
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+  return (
+    <svg width={size} height={size} className="-rotate-90 shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} stroke="#e5e7eb" />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        stroke="#2563eb"
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - clamped / 100)}
+      />
+    </svg>
+  );
+}
+
+function LevelBadge({ level }) {
+  const style =
+    level === 'ง่าย'
+      ? 'bg-green-100 text-green-700'
+      : level === 'ยาก'
+      ? 'bg-red-50 text-red-600'
+      : level === 'ปานกลาง'
+      ? 'bg-orange-50 text-orange-600'
+      : 'bg-gray-100 text-gray-500';
+  return <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${style}`}>{level || '-'}</span>;
+}
+
+function Field({ label, className = '', children }) {
+  return (
+    <div className={className}>
+      <label className="block text-xs font-semibold text-gray-600 mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function SearchInput({ value, onChange, placeholder }) {
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`${INPUT} !py-1.5 pl-8 text-sm sm:w-60`}
+      />
     </div>
   );
 }
