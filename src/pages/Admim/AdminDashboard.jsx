@@ -8,8 +8,12 @@ const NAV_ITEMS = [
   { key: 'categories', label: 'จัดการบทเรียน', icon: '🗂️', title: 'จัดการบทเรียน', subtitle: 'เพิ่มและจัดการหมวดหมู่บทเรียนในระบบ' },
   { key: 'lessons', label: 'จัดการคำศัพท์', icon: '📚', title: 'จัดการคำศัพท์', subtitle: 'เพิ่มคำศัพท์ภาษามือพร้อมวิดีโอตัวอย่าง และเปิด/ปิดการใช้งาน' },
   { key: 'ground-truth', label: 'Ground Truth', icon: '🎯', title: 'Ground Truth', subtitle: 'สร้างท่าต้นแบบจากวิดีโอตัวอย่าง เพื่อใช้ให้คะแนนการฝึก' },
-  { key: 'reports', label: 'ผลการประเมิน', icon: '📈', title: 'ผลการประเมิน', subtitle: 'ความคืบหน้าและความแม่นยำของผู้ใช้แต่ละคน แยกตามหมวดหมู่' },
   { key: 'summary', label: 'รายงาน', icon: '📄', title: 'รายงาน', subtitle: 'สรุปภาพรวมการใช้งานระบบรายเดือน' },
+];
+
+// หน้าที่ไม่มีในเมนูซ้าย เปิดได้จากปุ่ม "ดูความคืบหน้า" ในตารางผู้ใช้ — ไฮไลต์เมนู parent แทน
+const HIDDEN_VIEWS = [
+  { key: 'reports', parent: 'users', title: 'ผลการประเมิน', subtitle: 'ความคืบหน้าและความแม่นยำของผู้ใช้แต่ละคน แยกตามหมวดหมู่' },
 ];
 
 const CATEGORY_BAR_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-pink-500', 'bg-indigo-500'];
@@ -45,9 +49,10 @@ export default function AdminDashboard() {
   const [dragActiveNew, setDragActiveNew] = useState(false);
 
   // ★ เพิ่ม: แก้ไข video_url ของคำที่มีอยู่แล้ว (แยกจากฟอร์มเพิ่มคำใหม่ด้านบน)
-  const [editingVideoId, setEditingVideoId] = useState(null);
-  const [editingVideoUrl, setEditingVideoUrl] = useState('');
-  const [uploadingEditVideoId, setUploadingEditVideoId] = useState(null);
+  // แก้ไขคำศัพท์ที่มีอยู่แล้ว — null = ไม่ได้เปิดหน้าต่างแก้ไข
+  const [editingLesson, setEditingLesson] = useState(null);
+  const [savingLesson, setSavingLesson] = useState(false);
+  const [uploadingEditVideo, setUploadingEditVideo] = useState(false);
 
   // ★ เพิ่ม: สร้าง Ground Truth อัตโนมัติจากวิดีโอตัวอย่าง (video_url) ของคำนั้น
   const [buildingGtId, setBuildingGtId] = useState(null);
@@ -275,56 +280,79 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleEditVideoFileChange = async (e, lessonId) => {
+  const handleEditVideoFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadingEditVideoId(lessonId);
+    setUploadingEditVideo(true);
     try {
       const url = await uploadVideoFile(file);
-      setEditingVideoUrl(url);
+      setEditingLesson((prev) => ({ ...prev, video_url: url }));
     } catch (error) {
       alert(error.message);
     } finally {
-      setUploadingEditVideoId(null);
+      setUploadingEditVideo(false);
       e.target.value = '';
     }
   };
 
-  const startEditVideo = (lesson) => {
-    setEditingVideoId(lesson.id);
-    setEditingVideoUrl(lesson.video_url || '');
+  const startEditLesson = (lesson) => {
+    setEditingLesson({
+      id: lesson.id,
+      title: lesson.title || '',
+      category_id: String(lesson.category_id ?? ''),
+      description: lesson.description || '',
+      video_url: lesson.video_url || '',
+      original_video_url: lesson.video_url || '',
+    });
   };
 
-  const cancelEditVideo = () => {
-    setEditingVideoId(null);
-    setEditingVideoUrl('');
-  };
+  const cancelEditLesson = () => setEditingLesson(null);
 
-  const saveVideoUrl = async (lessonId) => {
+  // แก้ไขคำศัพท์ทั้งแถว (คำ / หมวดหมู่ / วิธีทำท่า / วิดีโอ) ผ่าน PUT /lessons/{id}
+  const saveEditLesson = async () => {
+    if (!editingLesson) return;
+    if (!editingLesson.title.trim()) {
+      alert('กรุณากรอกชื่อคำศัพท์');
+      return;
+    }
+    if (!editingLesson.category_id) {
+      alert('กรุณาเลือกหมวดหมู่');
+      return;
+    }
+
+    const body = {
+      title: editingLesson.title.trim(),
+      category_id: Number(editingLesson.category_id),
+      description: editingLesson.description.trim() || null,
+      video_url: editingLesson.video_url.trim() || null,
+    };
+
+    setSavingLesson(true);
     try {
       const token = localStorage.getItem('token');
-      const trimmedUrl = editingVideoUrl.trim() || null;
-      const res = await fetch(`http://127.0.0.1:8000/lessons/${lessonId}`, {
+      const res = await fetch(`http://127.0.0.1:8000/lessons/${editingLesson.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ video_url: trimmedUrl }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
-        setLessons((prev) =>
-          prev.map((l) => (l.id === lessonId ? { ...l, video_url: trimmedUrl } : l))
-        );
-        cancelEditVideo();
+        const updated = await res.json();
+        setLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+        setEditingLesson(null);
       } else {
-        alert('บันทึก Video URL ไม่สำเร็จ');
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.detail || 'บันทึกการแก้ไขไม่สำเร็จ');
       }
     } catch (error) {
-      console.error('Error saving video_url:', error);
+      console.error('Error updating lesson:', error);
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setSavingLesson(false);
     }
   };
 
@@ -517,7 +545,8 @@ export default function AdminDashboard() {
   });
 
   const adminName = localStorage.getItem('username') || 'ผู้ดูแลระบบ';
-  const activeNav = NAV_ITEMS.find((n) => n.key === activeTab) || NAV_ITEMS[0];
+  const activeNav = [...NAV_ITEMS, ...HIDDEN_VIEWS].find((n) => n.key === activeTab) || NAV_ITEMS[0];
+  const highlightedNavKey = activeNav.parent || activeNav.key;
 
   const lessonCountByCategory = (categoryId) => lessons.filter((l) => l.category_id === categoryId).length;
   const activeCountByCategory = (categoryId) => lessons.filter((l) => l.category_id === categoryId && l.is_active).length;
@@ -635,7 +664,7 @@ export default function AdminDashboard() {
               key={item.key}
               onClick={() => (item.key === 'summary' ? handleOpenLoginLogs() : setActiveTab(item.key))}
               className={`shrink-0 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-left whitespace-nowrap ${
-                activeTab === item.key ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-gray-100 hover:text-gray-900'
+                highlightedNavKey === item.key ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-gray-100 hover:text-gray-900'
               }`}
             >
               <span className="w-5 text-center">{item.icon}</span>
@@ -1024,43 +1053,18 @@ export default function AdminDashboard() {
                         <tr key={lesson.id} className="border-t border-gray-100">
                           <td className="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap">{lesson.title}</td>
                           <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{getCategoryName(lesson.category_id)}</td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {editingVideoId === lesson.id ? (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <input
-                                  type="text"
-                                  autoFocus
-                                  value={editingVideoUrl}
-                                  onChange={(e) => setEditingVideoUrl(e.target.value)}
-                                  placeholder="วาง Video URL ที่นี่"
-                                  className={`${INPUT} !w-40 !py-1 text-xs`}
-                                />
-                                <label className="text-xs text-blue-600 hover:underline cursor-pointer">
-                                  {uploadingEditVideoId === lesson.id ? '⏳ กำลังอัปโหลด...' : '📁 อัปโหลดไฟล์'}
-                                  <input
-                                    type="file"
-                                    accept="video/*"
-                                    onChange={(e) => handleEditVideoFileChange(e, lesson.id)}
-                                    disabled={uploadingEditVideoId === lesson.id}
-                                    className="hidden"
-                                  />
-                                </label>
-                                <button onClick={() => saveVideoUrl(lesson.id)} className="text-green-600 text-xs font-semibold">
-                                  บันทึก
-                                </button>
-                                <button onClick={cancelEditVideo} className="text-gray-400 hover:text-gray-600 text-xs">
-                                  ยกเลิก
-                                </button>
-                              </div>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {lesson.video_url ? (
+                              <a
+                                href={lesson.video_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-600 text-xs font-medium hover:underline"
+                              >
+                                ✅ มีวิดีโอ (เปิดดู)
+                              </a>
                             ) : (
-                              <div className="flex items-center gap-2 whitespace-nowrap">
-                                <span className={lesson.video_url ? 'text-green-600 text-xs font-medium' : 'text-gray-400 text-xs'}>
-                                  {lesson.video_url ? '✅ มีวิดีโอ' : '— ไม่มี'}
-                                </span>
-                                <button onClick={() => startEditVideo(lesson)} className="text-blue-600 text-xs underline">
-                                  แก้ไข
-                                </button>
-                              </div>
+                              <span className="text-gray-400 text-xs">— ไม่มี</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-center whitespace-nowrap">
@@ -1075,7 +1079,14 @@ export default function AdminDashboard() {
                               {lesson.is_active ? 'พร้อมใช้งาน' : 'ปิดใช้งาน'}
                             </button>
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-4 py-3 text-center whitespace-nowrap space-x-2">
+                            <button
+                              onClick={() => startEditLesson(lesson)}
+                              title="แก้ไขคำศัพท์"
+                              className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+                            >
+                              ✏️
+                            </button>
                             <button
                               onClick={() => handleDeleteLesson(lesson.id)}
                               title="ลบคำศัพท์"
@@ -1434,6 +1445,113 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
+
+      {/* หน้าต่างแก้ไขคำศัพท์ — กดพื้นหลังหรือ "ยกเลิก" เพื่อปิด */}
+      {editingLesson && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => !savingLesson && cancelEditLesson()}
+        >
+          <div
+            className={`${CARD} w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">แก้ไขคำศัพท์</h3>
+                <p className="text-xs text-gray-400">ID {editingLesson.id}</p>
+              </div>
+              <button
+                onClick={cancelEditLesson}
+                disabled={savingLesson}
+                className="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+                aria-label="ปิด"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <Field label="คำศัพท์">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={editingLesson.title}
+                    onChange={(e) => setEditingLesson((prev) => ({ ...prev, title: e.target.value }))}
+                    className={INPUT}
+                  />
+                </Field>
+                <Field label="หมวดหมู่">
+                  <select
+                    value={editingLesson.category_id}
+                    onChange={(e) => setEditingLesson((prev) => ({ ...prev, category_id: e.target.value }))}
+                    className={INPUT}
+                  >
+                    <option value="">-- เลือกหมวดหมู่ --</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="วิธีทำท่า">
+                  <textarea
+                    rows={4}
+                    value={editingLesson.description}
+                    onChange={(e) => setEditingLesson((prev) => ({ ...prev, description: e.target.value }))}
+                    className={INPUT}
+                  />
+                </Field>
+              </div>
+
+              <Field label="วิดีโอตัวอย่างท่า">
+                <div className="space-y-2">
+                  <div className="aspect-video rounded-xl overflow-hidden bg-gray-900 flex items-center justify-center">
+                    {uploadingEditVideo ? (
+                      <p className="text-sm text-gray-300">⏳ กำลังอัปโหลด...</p>
+                    ) : editingLesson.video_url ? (
+                      <video key={editingLesson.video_url} src={editingLesson.video_url} controls className="w-full h-full object-contain" />
+                    ) : (
+                      <p className="text-sm text-gray-400">ยังไม่มีวิดีโอ</p>
+                    )}
+                  </div>
+                  <label className="inline-block text-xs text-blue-600 hover:underline cursor-pointer font-medium">
+                    📁 อัปโหลดไฟล์ใหม่จากเครื่อง
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleEditVideoFileChange}
+                      disabled={uploadingEditVideo}
+                      className="hidden"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="หรือวาง Video URL ที่นี่"
+                    value={editingLesson.video_url}
+                    onChange={(e) => setEditingLesson((prev) => ({ ...prev, video_url: e.target.value }))}
+                    className={`${INPUT} text-xs`}
+                  />
+                  {editingLesson.video_url.trim() !== editingLesson.original_video_url && (
+                    <p className="text-xs text-orange-600">
+                      ⚠ เปลี่ยนวิดีโอแล้ว อย่าลืมไปกด "สร้าง Ground Truth" ใหม่ที่เมนู Ground Truth หลังบันทึก
+                    </p>
+                  )}
+                </div>
+              </Field>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={cancelEditLesson} disabled={savingLesson} className={BTN_GHOST}>
+                ยกเลิก
+              </button>
+              <button onClick={saveEditLesson} disabled={savingLesson || uploadingEditVideo} className={BTN_PRIMARY}>
+                {savingLesson ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
