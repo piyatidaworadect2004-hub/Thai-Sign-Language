@@ -223,9 +223,12 @@ def process_video(
     extractor: LandmarkExtractor,
     start_frame: int = 0,
     end_frame: Optional[int] = None,
+    frame_skip: int = 1,
 ) -> list:
     """
     Input : path วิดีโอต้นแบบ, ช่วงเฟรมที่มีความหมาย (ตัดส่วนก่อน/หลังท่าทางออก)
+            frame_skip=2 ประมวลผลแค่ 1 ใน 2 เฟรม ให้ตรงกับ engine.extract_feature_matrix_from_video
+            ของ backend (วิดีโอผู้ใช้กับ GT จะได้มีอัตราเฟรมสเกลเดียวกันตอนเทียบ DTW)
     Output: List[FrameRecord] ความยาว M (จำนวนเฟรมที่ใช้จริง)
     """
     cap = cv2.VideoCapture(video_path)
@@ -245,6 +248,9 @@ def process_video(
             continue
         if end_frame is not None and frame_idx > end_frame:
             break
+        if frame_idx % frame_skip != 0:
+            frame_idx += 1
+            continue
 
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         timestamp_ms = int((frame_idx / fps) * 1000)

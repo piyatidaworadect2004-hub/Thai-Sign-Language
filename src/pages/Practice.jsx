@@ -518,7 +518,6 @@ export default function Practice() {
         );
     }
 
-    const livePercent = Math.round(confidence * 100);
 
     return (
         <div className="min-h-screen bg-sky-100">
@@ -677,7 +676,8 @@ export default function Practice() {
                             </button>
                         </div>
 
-                        <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+                        <div className="grid gap-6 md:grid-cols-[3fr_2fr] md:items-start">
+                            {/* ซ้าย: กล้อง → ความใกล้เคียงแบบ real-time → ปุ่มฝึก → สถานะ */}
                             <div>
                                 <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-900">
                                     {practiceStarted ? (
@@ -724,7 +724,7 @@ export default function Practice() {
                                 </div>
 
                                 {/* min-height กันกล่องกระตุก — จองที่ไว้สำหรับสูงสุด 2 บรรทัดที่ขึ้น/หายสลับกันตอนตรวจจับมือ */}
-                                <div className="mt-2 space-y-1 min-h-[3rem]">
+                                <div className="mt-2 space-y-1 min-h-[3rem] text-center">
                                     {cameraOn && <p className="fade-in text-green-600 text-sm font-bold">กล้องทำงาน</p>}
                                     {handDetected && <p className="fade-in text-blue-600 text-sm font-bold">ตรวจพบมือ</p>}
                                     {!cameraOn && !practiceStarted && (
@@ -733,119 +733,112 @@ export default function Practice() {
                                 </div>
                             </div>
 
-                            {/* กราฟวัดความใกล้เคียงแบบ real-time — ค่ากลับเป็น 0% เองตอนมือหลุดเฟรม */}
-                            <div className="flex flex-col items-center gap-2 md:px-6 -translate-y-10">
-                                <ScoreRing
-                                    percent={livePercent}
-                                    colorClass={prediction ? "stroke-green-500" : "stroke-orange-400"}
-                                />
-                                <p className="text-xs text-gray-500">ความใกล้เคียงของท่าภาษามือ</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
-                        <div className="flex-1 h-px bg-gray-300" />
-                        ผลลัพธ์จะแสดงที่นี่หลังบันทึกท่า
-                        <div className="flex-1 h-px bg-gray-300" />
-                    </div>
-
-                    {compareError && (
-                        <div className="fade-in bg-red-50 border-2 border-red-300 rounded-2xl p-4">
-                            <p className="text-red-600 text-sm font-semibold">{compareError}</p>
-                        </div>
-                    )}
-
-                    {isComparing && (
-                        <div className="fade-in bg-white rounded-2xl shadow-md p-6 text-center text-sm text-gray-500">
-                            ⏳ กำลังเทียบท่าของคุณกับ Ground Truth...
-                        </div>
-                    )}
-
-                    {compareResult && (
-                        <div
-                            className={`fade-in bg-white rounded-2xl shadow-md p-5 sm:p-6 border-2 ${
-                                compareResult.is_pass ? "border-green-200" : "border-red-200"
-                            }`}
-                        >
-                            <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-                                <ScoreRing
-                                    percent={compareResult.correctness_percentage}
-                                    size={110}
-                                    colorClass={compareResult.is_pass ? "stroke-green-500" : "stroke-red-500"}
-                                />
-                                <div className="flex-1">
-                                    <span
-                                        className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${
-                                            compareResult.is_pass
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-red-100 text-red-600"
-                                        }`}
-                                    >
-                                        {compareResult.is_pass ? "✓ ผ่านเกณฑ์แล้ว" : "✕ ยังไม่ผ่านเกณฑ์"}
-                                    </span>
-                                    <h3 className="text-lg font-bold text-gray-800">
-                                        {compareResult.is_pass
-                                            ? "เยี่ยมมาก! ท่าภาษามือของคุณใกล้เคียงกับวิดีโอตัวอย่างมาก"
-                                            : "ยังไม่ผ่าน ดูวิดีโอตัวอย่างแล้วบันทึกท่าภาษามืออีกครั้ง"}
-                                    </h3>
-                                    {/* ผ่านเมื่อ best_score <= threshold ซึ่งตามสูตรแปลง % ใน backend ตรงกับ 50% พอดี */}
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        เกณฑ์ผ่านของคำนี้อยู่ที่ 50% ขึ้นไป · DTW Score: {compareResult.best_score} (threshold = {compareResult.threshold})
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="border-t border-gray-100 mt-5 pt-4">
-                                {compareResult.log_id ? (
-                                    <p className="text-xs text-gray-500">
-                                        บันทึกผลแล้ว (Log ID: {compareResult.log_id})
-                                    </p>
-                                ) : (
-                                    <p className="text-xs text-orange-500 font-semibold">
-                                        ⚠ ผลนี้ยังไม่ถูกบันทึก เนื่องจากคุณยังไม่ได้เข้าสู่ระบบ —{" "}
-                                        <button
-                                            onClick={() => navigate("/login")}
-                                            className="underline hover:text-orange-600"
-                                        >
-                                            เข้าสู่ระบบ
-                                        </button>
-                                        {" "}เพื่อบันทึกความคืบหน้า
-                                    </p>
+                            {/* ขวา: ผลลัพธ์หลังบันทึกท่า (แทนที่วงแหวนความใกล้เคียงเดิม) */}
+                            <div className="space-y-4">
+                                {compareError && (
+                                    <div className="fade-in bg-red-50 border-2 border-red-300 rounded-2xl p-4">
+                                        <p className="text-red-600 text-sm font-semibold">{compareError}</p>
+                                    </div>
                                 )}
 
-                                {compareResult.is_pass && (
-                                    <div className="mt-4 flex flex-wrap gap-3">
-                                        <button
-                                            onClick={() => {
-                                                setCompareResult(null);
-                                                setCompareError("");
-                                            }}
-                                            className="border-2 border-blue-500 text-blue-600 px-4 py-2 rounded-xl font-bold transition hover:bg-blue-50"
+                                {isComparing ? (
+                                    <div className="fade-in border-2 border-dashed border-gray-200 rounded-2xl p-6 min-h-[16rem] flex items-center justify-center text-center text-sm text-gray-500">
+                                        ⏳ กำลังเทียบท่าของคุณกับ Ground Truth...
+                                    </div>
+                                ) : compareResult ? (
+                                    <div
+                                        className={`fade-in rounded-2xl p-5 border-2 text-center ${
+                                            compareResult.is_pass ? "border-green-200" : "border-red-200"
+                                        }`}
+                                    >
+                                        <div className="flex justify-center">
+                                            <ScoreRing
+                                                percent={compareResult.correctness_percentage}
+                                                size={110}
+                                                colorClass={compareResult.is_pass ? "stroke-green-500" : "stroke-red-500"}
+                                            />
+                                        </div>
+                                        <span
+                                            className={`inline-block px-3 py-1 rounded-full text-xs font-bold mt-4 mb-2 ${
+                                                compareResult.is_pass
+                                                    ? "bg-green-100 text-green-700"
+                                                    : "bg-red-100 text-red-600"
+                                            }`}
                                         >
-                                            🔁 ฝึกคำนี้อีกครั้ง
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                if (!nextLesson) return;
-                                                navigate(`/practice/${nextLesson.id}`, {
-                                                    state: {
-                                                        word: nextLesson.word || nextLesson.title,
-                                                        isActive: true,
-                                                    },
-                                                });
-                                            }}
-                                            disabled={!nextLesson}
-                                            title={!nextLesson ? "ยังไม่มีคำถัดไปในหมวดนี้" : undefined}
-                                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl font-bold transition"
-                                        >
-                                            ▶ ฝึกคำถัดไป
-                                        </button>
+                                            {compareResult.is_pass ? "✓ ผ่านเกณฑ์แล้ว" : "✕ ยังไม่ผ่านเกณฑ์"}
+                                        </span>
+                                        <h3 className="text-base font-bold text-gray-800">
+                                            {compareResult.is_pass
+                                                ? "เยี่ยมมาก! ท่าภาษามือของคุณใกล้เคียงกับวิดีโอตัวอย่างมาก"
+                                                : "ยังไม่ผ่าน ดูวิดีโอตัวอย่างแล้วบันทึกท่าภาษามืออีกครั้ง"}
+                                        </h3>
+                                        {/* ผ่านเมื่อ best_score <= threshold ซึ่งตามสูตรแปลง % ใน backend ตรงกับ 50% พอดี */}
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            เกณฑ์ผ่านของคำนี้อยู่ที่ 50% ขึ้นไป
+                                        </p>
+                                        <p className="text-xs text-gray-400">
+                                            DTW Score: {compareResult.best_score} (threshold = {compareResult.threshold})
+                                        </p>
+
+                                        <div className="border-t border-gray-100 mt-4 pt-3">
+                                            {compareResult.log_id ? (
+                                                <p className="text-xs text-gray-500">
+                                                    บันทึกผลแล้ว (Log ID: {compareResult.log_id})
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-orange-500 font-semibold">
+                                                    ⚠ ผลนี้ยังไม่ถูกบันทึก เนื่องจากคุณยังไม่ได้เข้าสู่ระบบ —{" "}
+                                                    <button
+                                                        onClick={() => navigate("/login")}
+                                                        className="underline hover:text-orange-600"
+                                                    >
+                                                        เข้าสู่ระบบ
+                                                    </button>
+                                                    {" "}เพื่อบันทึกความคืบหน้า
+                                                </p>
+                                            )}
+
+                                            {compareResult.is_pass && (
+                                                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setCompareResult(null);
+                                                            setCompareError("");
+                                                        }}
+                                                        className="border-2 border-blue-500 text-blue-600 px-4 py-2 rounded-xl text-sm font-bold transition hover:bg-blue-50"
+                                                    >
+                                                        🔁 ฝึกคำนี้อีกครั้ง
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (!nextLesson) return;
+                                                            navigate(`/practice/${nextLesson.id}`, {
+                                                                state: {
+                                                                    word: nextLesson.word || nextLesson.title,
+                                                                    isActive: true,
+                                                                },
+                                                            });
+                                                        }}
+                                                        disabled={!nextLesson}
+                                                        title={!nextLesson ? "ยังไม่มีคำถัดไปในหมวดนี้" : undefined}
+                                                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl text-sm font-bold transition"
+                                                    >
+                                                        ▶ ฝึกคำถัดไป
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 min-h-[16rem] flex flex-col items-center justify-center text-center gap-2 text-gray-400">
+                                        <span className="text-3xl">📊</span>
+                                        <p className="text-sm font-semibold text-gray-500">ผลลัพธ์</p>
+                                        <p className="text-xs">ผลลัพธ์จะแสดงที่นี่หลังกด "เริ่มฝึกท่าทาง"</p>
                                     </div>
                                 )}
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </div>

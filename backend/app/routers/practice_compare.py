@@ -8,9 +8,10 @@ Endpoint สำหรับรับวิดีโอที่ผู้ใช�
 import os
 import tempfile
 import threading
+import urllib.parse
 import urllib.request
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, Header, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
@@ -19,11 +20,15 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Lesson, PracticeLog, User
 from app.routers.auth import get_current_user, require_admin
+from app.routers.lesson import ALLOWED_VIDEO_TYPES, MAX_UPLOAD_SIZE
 from app.sign_engine.engine import (
     LandmarkExtractor,
     extract_feature_matrix_from_video,
     compare_to_word,
     save_ground_truth_sample,
+    list_ground_truth_info,
+    DEFAULT_THRESHOLD,
+    FEATURE_VERSION,
 )
 
 router = APIRouter()
@@ -180,7 +185,8 @@ async def build_ground_truth_from_video(
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-    num_samples = await run_in_threadpool(save_ground_truth_sample, lesson.title, feature_matrix)
+    source_name = os.path.basename(urllib.parse.unquote(lesson.video_url.split("?")[0]))
+    num_samples = await run_in_threadpool(save_ground_truth_sample, lesson.title, feature_matrix, source_name)
 
     lesson.is_active = True
     db.commit()
@@ -191,4 +197,78 @@ async def build_ground_truth_from_video(
         "num_frames": int(feature_matrix.shape[0]),
         "num_samples": num_samples,
         "is_active": lesson.is_active,
+    }
+
+
+MAX_GT_FILES_PER_REQUEST = 10
+
+
+@router.post("/build-ground-truth/{lesson_id}/upload")
+async def build_ground_truth_from_uploads(
+    lesson_id: int,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    """
+    สร้าง Ground Truth จากคลิปที่แอดมินอัปโหลด (1 หรือหลายไฟล์) แต่ละคลิปเป็นตัวอย่างใหม่ 1 ตัว
+    ไฟล์ที่ล้มเหลวจะถูกข้ามและรายงานใน failed โดยไม่ยกเลิกไฟล์อื่น
+    """
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="ไม่พบคำศัพท์นี้")
+    if len(files) > MAX_GT_FILES_PER_REQUEST:
+        raise HTTPException(status_code=400, detail=f"อัปโหลดได้ครั้งละไม่เกิน {MAX_GT_FILES_PER_REQUEST} ไฟล์")
+
+    added, failed = [], []
+    num_samples = None
+    for upload in files:
+        name = upload.filename or "video"
+        if upload.content_type not in ALLOWED_VIDEO_TYPES:
+            failed.append({"file": name, "reason": "ไม่ใช่ไฟล์วิดีโอที่รองรับ (mp4, webm, mov, avi)"})
+            continue
+        content = await upload.read()
+        if len(content) > MAX_UPLOAD_SIZE:
+            failed.append({"file": name, "reason": "ไฟล์ใหญ่เกิน 100MB"})
+            continue
+
+        suffix = os.path.splitext(name)[1] or ".mp4"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            feature_matrix = await run_in_threadpool(_extract_with_lock, tmp_path)
+        except FileNotFoundError:
+            failed.append({"file": name, "reason": "เปิดไฟล์วิดีโอไม่ได้"})
+            continue
+        except ValueError as e:
+            failed.append({"file": name, "reason": str(e)})
+            continue
+        finally:
+            os.unlink(tmp_path)
+
+        num_samples = await run_in_threadpool(save_ground_truth_sample, lesson.title, feature_matrix, name)
+        added.append({"file": name, "num_frames": int(feature_matrix.shape[0])})
+
+    if added:
+        lesson.is_active = True
+        db.commit()
+
+    return {
+        "word": lesson.title,
+        "added": added,
+        "failed": failed,
+        "num_samples": num_samples,
+        "is_active": lesson.is_active,
+    }
+
+
+@router.get("/ground-truth-info")
+async def get_ground_truth_info(current_admin: User = Depends(require_admin)):
+    """สรุป Ground Truth (pre-computed features) ทุกคำ สำหรับแท็บ Ground Truth ในหน้า Admin"""
+    items = await run_in_threadpool(list_ground_truth_info)
+    return {
+        "threshold": DEFAULT_THRESHOLD,
+        "feature_version": FEATURE_VERSION,
+        "words": items,
     }

@@ -4,7 +4,9 @@ sign_engine/engine.py
 รวม Logic ทั้งหมดสำหรับตรวจสอบท่าภาษามือไว้ในไฟล์เดียว
 """
 
+import json
 import os
+from datetime import datetime
 from typing import Optional
 
 import cv2
@@ -24,6 +26,15 @@ GT_DATA_DIR = os.path.join(BASE_DIR, "gt_data")
 # → แก้ compute_features() เมื่อไหร่ ต้องเพิ่มเลขนี้ทุกครั้ง แล้วกดสร้าง Ground Truth ใหม่ทุกคำ
 FEATURE_VERSION = 1
 LEGACY_FEATURE_VERSION = 1  # ไฟล์ที่สร้างก่อนมีการใส่เวอร์ชัน ใช้สูตร 36 มิติเดียวกับ v1
+
+# 🔑 CORE: เกณฑ์ผ่าน (DTW score <= ค่านี้ = ท่าถูก)
+# ทำไม 0.05: วัดจากคลิปที่ไม่ได้ใช้สร้าง GT (49 คลิป × 10 คำ, frame_skip=2) ได้ท่าถูกผ่าน ~76%
+# ท่าผิดหลุดผ่านแค่ ~3% (ค่าเดิม 0.15 ปล่อยท่าผิดผ่านถึง ~42%)
+# ถ้าเปลี่ยนสูตร feature / frame_skip / ชุด GT ต้องวัดใหม่
+DEFAULT_THRESHOLD = 0.05
+
+# ประมวลผล 1 ใน N เฟรม ใช้ทั้งวิดีโอผู้ใช้และตอนสร้าง GT จากหน้าเว็บ (batch script ใช้ --frame-skip 2 ให้ตรงกัน)
+FRAME_SKIP = 2
 
 POSE_NOSE = 0
 POSE_LEFT_WRIST = 15
@@ -113,7 +124,7 @@ def compute_features(pose_world, hand_left_world, hand_right_world) -> np.ndarra
 
 
 def extract_feature_matrix_from_video(
-    video_path: str, extractor: LandmarkExtractor, frame_skip: int = 2
+    video_path: str, extractor: LandmarkExtractor, frame_skip: int = FRAME_SKIP
 ) -> np.ndarray:
     """
     frame_skip=2 หมายถึงประมวลผลแค่ 1 ใน 2 เฟรม (ข้ามเฟรมคี่) เพื่อลดจำนวนครั้งที่ต้องเรียก
@@ -225,15 +236,17 @@ def load_ground_truth_matrices(word: str) -> np.ndarray:
     return _gt_cache[word]
 
 
-def save_ground_truth_sample(word: str, feature_matrix: np.ndarray) -> int:
+def save_ground_truth_sample(word: str, feature_matrix: np.ndarray, source_name: Optional[str] = None) -> int:
     """
     เพิ่ม feature_matrix (จากวิดีโอตัวอย่าง 1 คลิป) เข้า gt_data/{word}.npz
     ถ้าคำนี้มี Ground Truth อยู่แล้วจะสะสมเป็นตัวอย่างที่ 2, 3, ... ไม่ทับของเดิม
     (รูปแบบไฟล์เดียวกับ ground_truth_pipeline/ground_truth_builder.py เพื่อให้ compare_to_word อ่านได้ตรงๆ)
+    อัปเดต gt_data/{word}.json คู่กันด้วย ให้ source_files / frames_per_sample ตรงกับตัวอย่างใน .npz
     คืนค่าจำนวนตัวอย่างทั้งหมดของคำนี้หลังบันทึก
     """
     os.makedirs(GT_DATA_DIR, exist_ok=True)
     npz_path = os.path.join(GT_DATA_DIR, f"{word}.npz")
+    json_path = os.path.join(GT_DATA_DIR, f"{word}.json")
 
     existing_matrices = []
     if os.path.exists(npz_path):
@@ -249,14 +262,79 @@ def save_ground_truth_sample(word: str, feature_matrix: np.ndarray) -> int:
         feature_version=FEATURE_VERSION,
     )
 
+    # metadata เดิมใช้ต่อได้ก็ต่อเมื่อตรงกับตัวอย่างที่เก็บไว้ (ถ้า .npz ถูกรีเซ็ตเพราะเวอร์ชันไม่ตรง ต้องรีเซ็ตด้วย)
+    meta = {}
+    if existing_matrices and os.path.exists(json_path):
+        with open(json_path, encoding="utf-8") as f:
+            meta = json.load(f)
+    num_old = len(existing_matrices)
+
+    def pad(values, fill):
+        values = list(values or [])[:num_old]
+        return values + [fill] * (num_old - len(values))
+
+    meta.update({
+        "label": word,
+        "num_samples": len(feature_matrices),
+        "feature_dim": int(feature_matrix.shape[1]),
+        "feature_version": FEATURE_VERSION,
+        "frame_skip": meta.get("frame_skip", FRAME_SKIP),
+        "source_files": pad(meta.get("source_files"), None) + [source_name],
+        "frames_per_sample": [int(m.shape[0]) for m in feature_matrices],
+    })
+    if "feature_matrices" in meta:
+        meta["feature_matrices"] = pad(meta["feature_matrices"], None) + [feature_matrix.tolist()]
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
     _gt_cache.pop(word, None)  # เคลียร์ cache กันอ่านของเก่าซ้ำในคำขอถัดไป
     return len(feature_matrices)
+
+
+def list_ground_truth_info() -> list:
+    """
+    สรุป Ground Truth (pre-computed features) ทุกคำใน gt_data สำหรับหน้า Admin
+    ส่งเฉพาะตัวเลขสรุป ไม่ส่ง feature_matrices เต็ม (ใหญ่เกินจะส่งไปหน้าเว็บ)
+    source_files / frame_skip มีเฉพาะไฟล์ที่สร้างจาก batch script (มี .json คู่กัน)
+    """
+    if not os.path.isdir(GT_DATA_DIR):
+        return []
+
+    items = []
+    for name in sorted(os.listdir(GT_DATA_DIR)):
+        if not name.endswith(".npz"):
+            continue
+        word = name[:-4]
+        npz_path = os.path.join(GT_DATA_DIR, name)
+        data = np.load(npz_path, allow_pickle=True)
+        matrices = data["feature_matrices"] if "feature_matrices" in data else []
+        version = _read_feature_version(data)
+
+        meta = {}
+        json_path = os.path.join(GT_DATA_DIR, f"{word}.json")
+        if os.path.exists(json_path):
+            with open(json_path, encoding="utf-8") as f:
+                meta = json.load(f)
+
+        items.append({
+            "word": word,
+            "num_samples": len(matrices),
+            "frames_per_sample": [int(m.shape[0]) for m in matrices],
+            "feature_dim": int(matrices[0].shape[1]) if len(matrices) else 0,
+            "feature_version": version,
+            "is_stale": version != FEATURE_VERSION,
+            "frame_skip": meta.get("frame_skip"),
+            "source_files": meta.get("source_files"),
+            "updated_at": datetime.fromtimestamp(os.path.getmtime(npz_path)).isoformat(timespec="seconds"),
+        })
+    return items
 
 
 # 🔑 CORE: เลือกคะแนนที่ดีที่สุดจากตัวอย่าง Ground Truth ทุกตัว
 # ทำไม: คำเดียวกันทำท่าได้หลายแบบเล็กน้อย (มุมกล้อง/สไตล์คนละคน) ถ้ามี Ground Truth
 # หลายตัวอย่าง ผู้ใช้ควรผ่านถ้าทำเหมือน "ตัวอย่างใดตัวอย่างหนึ่ง" ก็พอ ไม่ต้องเหมือนทุกตัว
-def compare_to_word(user_feature_matrix: np.ndarray, word: str, threshold: float = 0.15) -> dict:
+def compare_to_word(user_feature_matrix: np.ndarray, word: str, threshold: float = DEFAULT_THRESHOLD) -> dict:
     feature_matrices = load_ground_truth_matrices(word)
 
     scores = []

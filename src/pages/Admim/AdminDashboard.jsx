@@ -56,6 +56,15 @@ export default function AdminDashboard() {
 
   // ★ เพิ่ม: สร้าง Ground Truth อัตโนมัติจากวิดีโอตัวอย่าง (video_url) ของคำนั้น
   const [buildingGtId, setBuildingGtId] = useState(null);
+  // สรุป Ground Truth (pre-computed features) จาก gt_data — { threshold, feature_version, words: [...] }
+  const [gtInfo, setGtInfo] = useState(null);
+  const [expandedGtWord, setExpandedGtWord] = useState(null);
+  // อัปโหลดหลายคลิปสร้าง GT — แผงเปิดได้ทีละคำ (lesson.id), ไฟล์: { file, status: pending|processing|done|failed, frames, reason }
+  const [gtUploadLessonId, setGtUploadLessonId] = useState(null);
+  const [gtUploadFiles, setGtUploadFiles] = useState([]);
+  const [gtUploadRunning, setGtUploadRunning] = useState(false);
+  const [gtUploadSummary, setGtUploadSummary] = useState(null);
+  const [gtDragActive, setGtDragActive] = useState(false);
 
   // ★ เพิ่ม: ฟอร์ม + ค้นหา สำหรับแท็บ "จัดการบทเรียน" (หมวดหมู่)
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -109,8 +118,24 @@ export default function AdminDashboard() {
 
       // ★ เพิ่ม: โหลด login logs แบบเงียบๆ ไว้ล่วงหน้า ใช้โชว์เป็น "กิจกรรมล่าสุด" ในแดชบอร์ด
       fetchLoginLogsData();
+      fetchGroundTruthInfo();
     } catch (error) {
       console.error('Error fetching admin data:', error);
+    }
+  };
+
+  // โหลดสรุป Ground Truth ของทุกคำ (จำนวนตัวอย่าง/เฟรม/เวอร์ชัน) ใช้แสดงในแท็บ Ground Truth
+  const fetchGroundTruthInfo = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://127.0.0.1:8000/practice-compare/ground-truth-info', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setGtInfo(await res.json());
+      }
+    } catch (error) {
+      console.error('Error fetching ground truth info:', error);
     }
   };
 
@@ -377,6 +402,7 @@ export default function AdminDashboard() {
         setLessons((prev) =>
           prev.map((l) => (l.id === lesson.id ? { ...l, is_active: true } : l))
         );
+        fetchGroundTruthInfo();
       } else {
         alert(data.detail || 'สร้าง Ground Truth ไม่สำเร็จ');
       }
@@ -385,6 +411,81 @@ export default function AdminDashboard() {
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     } finally {
       setBuildingGtId(null);
+    }
+  };
+
+  const toggleGtUploadPanel = (lesson) => {
+    if (gtUploadRunning) return;
+    setGtUploadLessonId((prev) => (prev === lesson.id ? null : lesson.id));
+    setGtUploadFiles([]);
+    setGtUploadSummary(null);
+  };
+
+  const addGtUploadFiles = (fileList) => {
+    const videos = Array.from(fileList).filter((f) => f.type.startsWith('video/'));
+    if (videos.length < fileList.length) {
+      alert('ข้ามไฟล์ที่ไม่ใช่วิดีโอ');
+    }
+    setGtUploadSummary(null);
+    setGtUploadFiles((prev) => {
+      const seen = new Set(prev.map((x) => `${x.file.name}-${x.file.size}`));
+      const fresh = videos
+        .filter((f) => !seen.has(`${f.name}-${f.size}`))
+        .map((file) => ({ file, status: 'pending' }));
+      return [...prev, ...fresh].slice(0, 10);
+    });
+  };
+
+  const removeGtUploadFile = (index) => {
+    setGtUploadFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateGtUploadFile = (index, patch) => {
+    setGtUploadFiles((prev) => prev.map((x, i) => (i === index ? { ...x, ...patch } : x)));
+  };
+
+  // ส่งทีละไฟล์ (1 request ต่อ 1 คลิป ~7 วินาที) เพื่อให้แสดงสถานะรายไฟล์และความคืบหน้าได้จริง
+  const handleStartGtUpload = async (lesson) => {
+    const token = localStorage.getItem('token');
+    const queue = gtUploadFiles.map((x, i) => ({ ...x, index: i })).filter((x) => x.status !== 'done');
+    let added = 0;
+    let failed = 0;
+    let numSamples = gtByWord[lesson.title]?.num_samples || 0;
+
+    setGtUploadRunning(true);
+    setGtUploadSummary(null);
+    for (const item of queue) {
+      updateGtUploadFile(item.index, { status: 'processing', reason: null });
+      try {
+        const formData = new FormData();
+        formData.append('files', item.file);
+        const res = await fetch(`http://127.0.0.1:8000/practice-compare/build-ground-truth/${lesson.id}/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        const data = await res.json();
+        if (res.ok && data.added.length > 0) {
+          added += 1;
+          numSamples = data.num_samples;
+          updateGtUploadFile(item.index, { status: 'done', frames: data.added[0].num_frames });
+        } else {
+          failed += 1;
+          const reason = data.failed?.[0]?.reason || data.detail || 'ประมวลผลไม่สำเร็จ';
+          updateGtUploadFile(item.index, { status: 'failed', reason });
+        }
+      } catch (error) {
+        console.error('Error uploading ground truth clip:', error);
+        failed += 1;
+        updateGtUploadFile(item.index, { status: 'failed', reason: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' });
+      }
+    }
+    setGtUploadRunning(false);
+    setGtUploadSummary({ added, failed, numSamples });
+
+    if (added > 0) {
+      setLessons((prev) => prev.map((l) => (l.id === lesson.id ? { ...l, is_active: true } : l)));
+      fetchGroundTruthInfo();
     }
   };
 
@@ -543,6 +644,15 @@ export default function AdminDashboard() {
     const matchesCategory = !lessonCategoryFilter || String(l.category_id) === String(lessonCategoryFilter);
     return matchesSearch && matchesCategory;
   });
+
+  // จับคู่ Ground Truth กับบทเรียนด้วยชื่อคำ (backend ค้น gt_data ด้วย lesson.title)
+  const gtByWord = Object.fromEntries((gtInfo?.words || []).map((g) => [g.word, g]));
+  const lessonTitles = new Set(lessons.map((l) => l.title));
+  const orphanGtWords = (gtInfo?.words || []).filter((g) => !lessonTitles.has(g.word)).map((g) => g.word);
+  const lessonsWithGt = lessons.filter((l) => gtByWord[l.title] && !gtByWord[l.title].is_stale).length;
+  const totalGtSamples = lessons.reduce((sum, l) => sum + (gtByWord[l.title]?.num_samples || 0), 0);
+  const formatThaiDate = (iso) =>
+    new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 
   const adminName = localStorage.getItem('username') || 'ผู้ดูแลระบบ';
   const activeNav = [...NAV_ITEMS, ...HIDDEN_VIEWS].find((n) => n.key === activeTab) || NAV_ITEMS[0];
@@ -1115,8 +1225,33 @@ export default function AdminDashboard() {
           {activeTab === 'ground-truth' && (
             <>
               <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-600">
-                กด "สร้าง Ground Truth" เพื่อประมวลผลวิดีโอตัวอย่างของคำนั้นเป็นท่าต้นแบบที่ใช้ให้คะแนน
-                สร้างสำเร็จแล้วระบบจะเปิดใช้งานคำนั้นให้อัตโนมัติ (ต้องมีวิดีโอตัวอย่างก่อน)
+                เพิ่มท่าต้นแบบที่ใช้ให้คะแนนได้ 2 แบบ: "🎯 จากวิดีโอตัวอย่าง" ใช้วิดีโอตัวอย่างของคำนั้น 1 คลิป
+                หรือ "📤 อัปโหลดคลิป" เลือกคลิปจากเครื่องได้หลายคลิปพร้อมกัน แต่ละคลิปจะสะสมเป็นตัวอย่างใหม่
+                สร้างสำเร็จแล้วระบบจะเปิดใช้งานคำนั้นให้อัตโนมัติ · กดที่แถวเพื่อดูรายละเอียดตัวอย่าง
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className={`${CARD} p-5`}>
+                  <p className="text-xs text-gray-400">คำที่มีท่าต้นแบบแล้ว</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-800">
+                    {lessonsWithGt}
+                    <span className="text-base font-medium text-gray-400"> / {lessons.length} คำ</span>
+                  </p>
+                </div>
+                <div className={`${CARD} p-5`}>
+                  <p className="text-xs text-gray-400">ตัวอย่างท่าต้นแบบทั้งหมด</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-800">
+                    {totalGtSamples}
+                    <span className="text-base font-medium text-gray-400"> คลิป</span>
+                  </p>
+                </div>
+                <div className={`${CARD} p-5`}>
+                  <p className="text-xs text-gray-400">เกณฑ์ผ่าน (DTW threshold)</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-800">
+                    {gtInfo ? gtInfo.threshold : '—'}
+                    <span className="text-base font-medium text-gray-400"> = ความใกล้เคียง 50%</span>
+                  </p>
+                </div>
               </div>
 
               <div className={`${CARD} p-5`}>
@@ -1145,13 +1280,25 @@ export default function AdminDashboard() {
                         <th className={TH}>หมวดหมู่</th>
                         <th className={TH}>วิดีโอตัวอย่าง</th>
                         <th className={TH}>สถานะ</th>
+                        <th className={TH}>ข้อมูลท่าต้นแบบ</th>
                         <th className={`${TH} text-center`}>Ground Truth</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredLessons.map((lesson) => (
-                        <tr key={lesson.id} className="border-t border-gray-100">
-                          <td className="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap">{lesson.title}</td>
+                      {filteredLessons.map((lesson) => {
+                        const gt = gtByWord[lesson.title];
+                        const isExpanded = expandedGtWord === lesson.title;
+                        const isUploadOpen = gtUploadLessonId === lesson.id;
+                        return (
+                        <React.Fragment key={lesson.id}>
+                        <tr
+                          className={`border-t border-gray-100 ${gt ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                          onClick={() => gt && setExpandedGtWord(isExpanded ? null : lesson.title)}
+                        >
+                          <td className="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap">
+                            {gt && <span className="inline-block w-4 text-gray-400">{isExpanded ? '▾' : '▸'}</span>}
+                            {lesson.title}
+                          </td>
                           <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{getCategoryName(lesson.category_id)}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={lesson.video_url ? 'text-green-600 text-xs font-medium' : 'text-gray-400 text-xs'}>
@@ -1167,21 +1314,192 @@ export default function AdminDashboard() {
                               {lesson.is_active ? 'พร้อมใช้งาน' : 'ปิดใช้งาน'}
                             </span>
                           </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {!gt ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">ยังไม่มี</span>
+                            ) : gt.is_stale ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">ต้องสร้างใหม่</span>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                <span className="w-fit px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                  {gt.num_samples} ตัวอย่าง
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {Math.min(...gt.frames_per_sample)}–{Math.max(...gt.frames_per_sample)} เฟรม · {gt.feature_dim} มิติ · อัปเดต {formatThaiDate(gt.updated_at)}
+                                </span>
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-center whitespace-nowrap">
-                            <button
-                              onClick={() => handleBuildGroundTruth(lesson)}
-                              disabled={!lesson.video_url || buildingGtId === lesson.id}
-                              title={!lesson.video_url ? 'ต้องมี Video URL ก่อน' : 'ประมวลผลวิดีโอตัวอย่างเป็น Ground Truth ให้คำนี้'}
-                              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
-                            >
-                              {buildingGtId === lesson.id ? '⏳ กำลังสร้าง...' : '🎯 สร้าง Ground Truth'}
-                            </button>
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleBuildGroundTruth(lesson); }}
+                                disabled={!lesson.video_url || buildingGtId === lesson.id || (gtUploadRunning && isUploadOpen)}
+                                title={!lesson.video_url ? 'ต้องมี Video URL ก่อน' : 'ประมวลผลวิดีโอตัวอย่างของคำนี้เป็น Ground Truth 1 ตัวอย่าง'}
+                                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              >
+                                {buildingGtId === lesson.id ? '⏳ กำลังสร้าง...' : '🎯 จากวิดีโอตัวอย่าง'}
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleGtUploadPanel(lesson); }}
+                                disabled={gtUploadRunning || buildingGtId === lesson.id}
+                                title="อัปโหลดคลิปจากเครื่อง (ได้หลายคลิป) เพื่อเพิ่มตัวอย่างท่าต้นแบบ"
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed ${
+                                  isUploadOpen ? 'bg-blue-100 text-blue-700' : 'bg-white border border-blue-200 text-blue-600 hover:bg-blue-50'
+                                }`}
+                              >
+                                📤 อัปโหลดคลิป
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                        {isUploadOpen && (
+                          <tr className="bg-blue-50/40">
+                            <td colSpan="6" className="px-6 py-5">
+                              <div className="flex flex-col lg:flex-row gap-5">
+                                <div
+                                  onDragOver={(e) => { e.preventDefault(); if (!gtUploadRunning) setGtDragActive(true); }}
+                                  onDragLeave={() => setGtDragActive(false)}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    setGtDragActive(false);
+                                    if (!gtUploadRunning) addGtUploadFiles(e.dataTransfer.files);
+                                  }}
+                                  className={`lg:w-72 shrink-0 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-5 text-center transition ${
+                                    gtDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white'
+                                  }`}
+                                >
+                                  <span className="text-2xl text-gray-400">⬆</span>
+                                  <p className="text-sm text-gray-600 font-medium">ลากคลิปท่า "{lesson.title}" มาวางที่นี่</p>
+                                  <label className={`text-xs font-medium ${gtUploadRunning ? 'text-gray-400' : 'text-blue-600 hover:underline cursor-pointer'}`}>
+                                    หรือเลือกไฟล์จากเครื่อง
+                                    <input
+                                      type="file"
+                                      multiple
+                                      accept="video/*"
+                                      className="hidden"
+                                      disabled={gtUploadRunning}
+                                      onChange={(e) => { addGtUploadFiles(e.target.files); e.target.value = ''; }}
+                                    />
+                                  </label>
+                                  <p className="text-xs text-gray-400 leading-relaxed">
+                                    ครั้งละไม่เกิน 10 คลิป · แนะนำ 3–5 คลิปต่อคำ<br />
+                                    ให้ครอบคลุมหลายแบบ (มือเดียว/สองมือ, คนละคน)
+                                  </p>
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  {gtUploadFiles.length === 0 ? (
+                                    <p className="text-sm text-gray-400 py-6 text-center">ยังไม่ได้เลือกคลิป</p>
+                                  ) : (
+                                    <>
+                                      <ul className="divide-y divide-gray-100 bg-white rounded-xl border border-gray-100">
+                                        {gtUploadFiles.map((item, i) => (
+                                          <li key={`${item.file.name}-${i}`} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                                            <span className="w-5 text-center">
+                                              {item.status === 'done' ? '✅' : item.status === 'failed' ? '❌' : item.status === 'processing' ? '⏳' : '🎬'}
+                                            </span>
+                                            <div className="flex-1 min-w-0">
+                                              <p className="truncate text-gray-800">{item.file.name}</p>
+                                              <p className={`text-xs ${item.status === 'failed' ? 'text-red-500' : 'text-gray-400'}`}>
+                                                {(item.file.size / (1024 * 1024)).toFixed(1)} MB ·{' '}
+                                                {item.status === 'pending' && 'รอประมวลผล'}
+                                                {item.status === 'processing' && 'กำลังประมวลผล...'}
+                                                {item.status === 'done' && `สำเร็จ (${item.frames} เฟรม)`}
+                                                {item.status === 'failed' && `ล้มเหลว: ${item.reason}`}
+                                              </p>
+                                            </div>
+                                            {!gtUploadRunning && item.status !== 'done' && (
+                                              <button
+                                                onClick={() => removeGtUploadFile(i)}
+                                                className="text-xs text-gray-400 hover:text-red-500"
+                                                title="เอาออก"
+                                              >
+                                                ✕
+                                              </button>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ul>
+
+                                      {(() => {
+                                        const finished = gtUploadFiles.filter((x) => x.status === 'done' || x.status === 'failed').length;
+                                        const remaining = gtUploadFiles.filter((x) => x.status !== 'done').length;
+                                        return (
+                                          <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                                            <div className="flex-1">
+                                              <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                                                <div
+                                                  className="h-full bg-blue-600 transition-all"
+                                                  style={{ width: `${(finished / gtUploadFiles.length) * 100}%` }}
+                                                />
+                                              </div>
+                                              <p className="mt-1 text-xs text-gray-500">
+                                                {gtUploadRunning ? 'กำลังประมวลผล ' : ''}{finished}/{gtUploadFiles.length} คลิป
+                                              </p>
+                                            </div>
+                                            <button
+                                              onClick={() => handleStartGtUpload(lesson)}
+                                              disabled={gtUploadRunning || remaining === 0}
+                                              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                            >
+                                              {gtUploadRunning ? '⏳ กำลังสร้าง...' : `เริ่มสร้าง Ground Truth (${remaining} คลิป)`}
+                                            </button>
+                                          </div>
+                                        );
+                                      })()}
+                                    </>
+                                  )}
+
+                                  {gtUploadSummary && (
+                                    <div className={`mt-3 rounded-xl p-3 text-sm ${
+                                      gtUploadSummary.added > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                                    }`}>
+                                      เพิ่มสำเร็จ {gtUploadSummary.added} คลิป
+                                      {gtUploadSummary.failed > 0 && ` · ล้มเหลว ${gtUploadSummary.failed}`}
+                                      {' '}· รวม {gtUploadSummary.numSamples} ตัวอย่าง
+                                      {gtUploadSummary.added > 0 && ' — เปิดใช้งานคำนี้ให้อัตโนมัติแล้ว'}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        {isExpanded && gt && (
+                          <tr className="bg-gray-50">
+                            <td colSpan="6" className="px-6 py-4">
+                              <p className="text-xs text-gray-500 mb-2">
+                                Feature เวอร์ชัน {gt.feature_version}
+                                {gt.frame_skip ? ` · ประมวลผล 1 ใน ${gt.frame_skip} เฟรม` : ''}
+                              </p>
+                              <table className="text-xs">
+                                <thead>
+                                  <tr className="text-left text-gray-400">
+                                    <th className="pr-6 py-1 font-medium">#</th>
+                                    <th className="pr-6 py-1 font-medium">คลิปต้นฉบับ</th>
+                                    <th className="py-1 font-medium text-right">จำนวนเฟรม</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {gt.frames_per_sample.map((frames, i) => (
+                                    <tr key={i} className="text-gray-700">
+                                      <td className="pr-6 py-1">{i + 1}</td>
+                                      <td className="pr-6 py-1">{gt.source_files?.[i] || 'สร้างจากหน้าเว็บ'}</td>
+                                      <td className="py-1 text-right">{frames}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
+                        );
+                      })}
                       {filteredLessons.length === 0 && (
                         <tr>
-                          <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-400">
+                          <td colSpan="6" className="px-4 py-8 text-center text-sm text-gray-400">
                             ไม่พบคำศัพท์ที่ตรงกับเงื่อนไข
                           </td>
                         </tr>
@@ -1189,6 +1507,13 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+
+                {orphanGtWords.length > 0 && (
+                  <div className="mt-4 bg-orange-50 border border-orange-100 rounded-xl p-3 text-xs text-orange-700">
+                    ⚠ มีท่าต้นแบบที่ไม่ตรงกับชื่อคำศัพท์ใดเลย (ระบบจะไม่นำไปใช้): {orphanGtWords.join(', ')}
+                    — ตั้งชื่อคำศัพท์ให้ตรงกับชื่อนี้ทุกตัวอักษร
+                  </div>
+                )}
               </div>
             </>
           )}
