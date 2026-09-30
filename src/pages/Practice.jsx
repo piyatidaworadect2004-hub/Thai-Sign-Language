@@ -17,6 +17,12 @@ const RECORD_DURATION_MS = 3000;
 const PREDICT_WINDOW_MS = 3000;       // เก็บ buffer ย้อนหลังกี่ ms เพื่อส่งไปเทียบ real-time
 const BUFFER_PUSH_INTERVAL_MS = 100;  // ความถี่เก็บเฟรมเข้า buffer (~10fps พอสำหรับ DTW)
 
+const STEPS = [
+    { n: 1, label: "ดูตัวอย่าง" },
+    { n: 2, label: "ฝึกกับกล้อง" },
+    { n: 3, label: "ดูผลลัพธ์" },
+];
+
 export default function Practice() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -27,6 +33,7 @@ export default function Practice() {
     const mediaRecorderRef = useRef(null);
     const recordedChunksRef = useRef([]);
 
+    const [step, setStep] = useState(1);
     const [cameraOn, setCameraOn] = useState(false);
     const [handDetected, setHandDetected] = useState(false);
     const [practiceStarted, setPracticeStarted] = useState(false);
@@ -141,6 +148,12 @@ export default function Practice() {
     useEffect(() => {
         setExampleVideoAvailable(true);
     }, [targetWord]);
+
+    useEffect(() => {
+        setStep(1);
+        setCompareResult(null);
+        setCompareError("");
+    }, [id]);
 
     async function predictSign(frames) {
         if (!frames.length) return;
@@ -466,6 +479,10 @@ export default function Practice() {
             if (poseLandmarkerInstance) {
                 poseLandmarkerInstance.close();
             }
+            setCameraOn(false);
+            setHandDetected(false);
+            setPrediction("");
+            setConfidence(0);
         };
 
     }, [id, lessonLoading, isActive, practiceStarted]);
@@ -514,13 +531,45 @@ export default function Practice() {
                     ← กลับ
                 </button>
 
-                <p className="text-sm text-gray-500">สวัสดี · ID {id}</p>
+                <p className="text-sm text-gray-500">{targetWord} · ID {id}</p>
                 <h1 className="text-3xl font-bold text-gray-800 mt-1">ฝึกท่าทางภาษามือ</h1>
                 <p className="text-lg mt-1 text-gray-600">
                     คำที่กำลังฝึก: <span className="font-bold text-blue-600">{targetWord}</span>
                 </p>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                {/* Step indicator */}
+                <div className="flex items-center justify-center gap-2 sm:gap-3 mt-6 mb-2">
+                    {STEPS.map((s, idx) => (
+                        <div key={s.n} className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex items-center gap-2">
+                                <span
+                                    className={`flex items-center justify-center w-7 h-7 shrink-0 rounded-full text-sm font-bold ${
+                                        step > s.n
+                                            ? "bg-green-500 text-white"
+                                            : step === s.n
+                                            ? "bg-blue-600 text-white"
+                                            : "bg-gray-200 text-gray-500"
+                                    }`}
+                                >
+                                    {step > s.n ? "✓" : s.n}
+                                </span>
+                                <span
+                                    className={`text-sm font-semibold hidden sm:inline ${
+                                        step === s.n ? "text-blue-600" : "text-gray-500"
+                                    }`}
+                                >
+                                    {s.label}
+                                </span>
+                            </div>
+                            {idx < STEPS.length - 1 && (
+                                <div className={`w-8 sm:w-14 h-0.5 rounded ${step > s.n ? "bg-green-500" : "bg-gray-200"}`} />
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {/* ขั้นที่ 1: ดูตัวอย่าง */}
+                <div className={step === 1 ? "max-w-2xl mx-auto mt-4 space-y-6" : "hidden"}>
                     {/* วิดีโอตัวอย่างท่า */}
                     <div className="bg-white rounded-2xl shadow-md p-5">
                         <h2 className="text-lg font-bold text-gray-800">วิดีโอตัวอย่างท่า</h2>
@@ -566,15 +615,44 @@ export default function Practice() {
                         )}
                     </div>
 
-                    {/* กล้องผู้ใช้ + ปุ่มควบคุม */}
+                    {/* วิธีทำท่ามือ */}
+                    <div className="bg-white rounded-2xl shadow-md p-5">
+                        <h2 className="text-lg font-bold text-gray-800 mb-3">วิธีทำท่ามือ</h2>
+                        <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
+                            <li>วางมือทั้งสองข้างบริเวณหน้าอก นิ้วชิดกันเล็กน้อย</li>
+                            <li>ก้มศีรษะเล็กน้อยพร้อมโค้งมือลงหน้าอก 2-3 ครั้ง</li>
+                            <li>ทำท่าตามตัวอย่างวิดีโอด้านซ้ายให้ช้าและชัดเจน</li>
+                        </ol>
+                        <p className="text-xs text-gray-400 mt-3">* เนื้อหาตัวอย่าง ยังไม่ใช่ขั้นตอนจริงของทุกคำ</p>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={() => {
+                                setPracticeStarted(true);
+                                setStep(2);
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition"
+                        >
+                            ถัดไป: เริ่มฝึก →
+                        </button>
+                    </div>
+                </div>
+
+                {/* ขั้นที่ 2: ฝึกกับกล้อง */}
+                <div className={step === 2 ? "max-w-2xl mx-auto mt-4 space-y-6" : "hidden"}>
                     <div className="bg-white rounded-2xl shadow-md p-5">
                         <div className="flex flex-wrap gap-3 mb-3">
                             <button
-                                onClick={() => setPracticeStarted(true)}
-                                disabled={practiceStarted}
-                                className="border-2 border-blue-500 text-blue-600 disabled:border-gray-300 disabled:text-gray-400 px-4 py-2 rounded-xl font-bold transition hover:bg-blue-50"
+                                onClick={() => setPracticeStarted((prev) => !prev)}
+                                disabled={isRecording || isComparing}
+                                className={
+                                    practiceStarted
+                                        ? "border-2 border-red-400 text-red-600 bg-red-50 disabled:opacity-50 px-4 py-2 rounded-xl font-bold transition hover:bg-red-100"
+                                        : "border-2 border-blue-500 text-blue-600 disabled:opacity-50 px-4 py-2 rounded-xl font-bold transition hover:bg-blue-50"
+                                }
                             >
-                                🟡 เริ่มฝึกท่า
+                                {practiceStarted ? "🔴 ปิดกล้อง" : "🟢 เปิดกล้อง"}
                             </button>
                             <button
                                 onClick={startRecordingAndCompare}
@@ -648,18 +726,24 @@ export default function Practice() {
                         </div>
                     </div>
 
-                    {/* วิธีทำท่ามือ */}
-                    <div className="bg-white rounded-2xl shadow-md p-5">
-                        <h2 className="text-lg font-bold text-gray-800 mb-3">วิธีทำท่ามือ</h2>
-                        <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
-                            <li>วางมือทั้งสองข้างบริเวณหน้าอก นิ้วชิดกันเล็กน้อย</li>
-                            <li>ก้มศีรษะเล็กน้อยพร้อมโค้งมือลงหน้าอก 2-3 ครั้ง</li>
-                            <li>ทำท่าตามตัวอย่างวิดีโอด้านซ้ายให้ช้าและชัดเจน</li>
-                        </ol>
-                        <p className="text-xs text-gray-400 mt-3">* เนื้อหาตัวอย่าง ยังไม่ใช่ขั้นตอนจริงของทุกคำ</p>
+                    <div className="flex justify-between">
+                        <button
+                            onClick={() => setStep(1)}
+                            className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-xl font-bold transition"
+                        >
+                            ← ย้อนกลับ
+                        </button>
+                        <button
+                            onClick={() => setStep(3)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition"
+                        >
+                            ถัดไป: ดูผลลัพธ์ →
+                        </button>
                     </div>
+                </div>
 
-                    {/* ผลการตรวจสอบท่า */}
+                {/* ขั้นที่ 3: ดูผลลัพธ์ */}
+                <div className={step === 3 ? "max-w-2xl mx-auto mt-4 space-y-6" : "hidden"}>
                     <div className="bg-white rounded-2xl shadow-md p-5">
                         <h2 className="text-lg font-bold text-gray-800 mb-1">
                             ผลการตรวจสอบท่า (เทียบกับ Ground Truth)
@@ -707,6 +791,7 @@ export default function Practice() {
                                             onClick={() => {
                                                 setCompareResult(null);
                                                 setCompareError("");
+                                                setStep(2);
                                             }}
                                             className="border-2 border-blue-500 text-blue-600 px-4 py-2 rounded-xl font-bold transition hover:bg-blue-50"
                                         >
@@ -734,6 +819,15 @@ export default function Practice() {
                         ) : (
                             !handDetected && <p className="text-gray-400 text-sm">ยังไม่มีการบันทึกท่า</p>
                         )}
+                    </div>
+
+                    <div className="flex justify-start">
+                        <button
+                            onClick={() => setStep(2)}
+                            className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-xl font-bold transition"
+                        >
+                            ← ย้อนกลับ
+                        </button>
                     </div>
                 </div>
             </div>

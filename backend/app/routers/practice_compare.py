@@ -112,6 +112,9 @@ async def compare_practice_video(
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+    # 🔑 CORE: แปลง DTW score (ยิ่งน้อยยิ่งดี, ไม่มีเพดานบน) เป็น % ที่มนุษย์อ่านง่าย
+    # ทำไม: เทียบเท่า score=threshold (พอดีเส้นผ่าน) ให้ตกกลางพอดีที่ 50% โดยตั้งเพดาน
+    # ไว้ที่ threshold*2 — เลย 2 เท่าของ threshold ไปถือว่าต่างจนไม่มีความหมาย จึงตัดที่ 0%
     max_expected_score = result["threshold"] * 2
     correctness_percentage = max(0.0, 100.0 * (1 - result["best_score"] / max_expected_score))
     confidence = correctness_percentage / 100.0

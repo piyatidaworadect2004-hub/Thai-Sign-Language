@@ -18,6 +18,13 @@ POSE_MODEL_PATH = os.path.join(BASE_DIR, "pose_landmarker.task")
 HAND_MODEL_PATH = os.path.join(BASE_DIR, "hand_landmarker.task")
 GT_DATA_DIR = os.path.join(BASE_DIR, "gt_data")
 
+# 🔑 CORE: เวอร์ชันของสูตร compute_features()
+# ทำไม: Ground Truth เป็น feature ที่คำนวณเก็บไว้ล่วงหน้า ถ้าแก้สูตร feature แล้วไม่เพิ่มเลขนี้
+# ไฟล์ .npz เก่าจะถูกเทียบกับวิดีโอผู้ใช้ที่คำนวณด้วยสูตรใหม่ ได้คะแนนเพี้ยนโดยไม่มี error เตือน
+# → แก้ compute_features() เมื่อไหร่ ต้องเพิ่มเลขนี้ทุกครั้ง แล้วกดสร้าง Ground Truth ใหม่ทุกคำ
+FEATURE_VERSION = 1
+LEGACY_FEATURE_VERSION = 1  # ไฟล์ที่สร้างก่อนมีการใส่เวอร์ชัน ใช้สูตร 36 มิติเดียวกับ v1
+
 POSE_NOSE = 0
 POSE_LEFT_WRIST = 15
 POSE_RIGHT_WRIST = 16
@@ -174,6 +181,10 @@ def dtw_distance(cost_matrix: np.ndarray) -> float:
     return float(D[N, M])
 
 
+# 🔑 CORE: DTW Sequence Matching
+# ทำไม: วิดีโอผู้ใช้กับ Ground Truth มีจำนวนเฟรมไม่เท่ากันเสมอ (คนทำท่าเร็ว/ช้าต่างกัน)
+# ลบเฟรมต่อเฟรมตรงๆ ไม่ได้ ต้องใช้ DTW หาการจับคู่เฟรมที่ต้นทุนรวมต่ำสุดแทน
+# ต้นทุนต่อคู่เฟรมคือ cosine distance ของ feature vector (cosine_distance_matrix)
 def compare_sequences(user_matrix: np.ndarray, gt_matrix: np.ndarray) -> float:
     N, M = user_matrix.shape[0], gt_matrix.shape[0]
     cost_matrix = cosine_distance_matrix(user_matrix, gt_matrix)
@@ -182,6 +193,16 @@ def compare_sequences(user_matrix: np.ndarray, gt_matrix: np.ndarray) -> float:
 
 
 _gt_cache: dict = {}
+
+
+class StaleGroundTruthError(FileNotFoundError):
+    """สืบทอดจาก FileNotFoundError ให้ endpoint เดิมที่ดัก FileNotFoundError จัดการต่อได้เลย"""
+
+
+def _read_feature_version(data) -> int:
+    if "feature_version" in data:
+        return int(data["feature_version"])
+    return LEGACY_FEATURE_VERSION
 
 
 def load_ground_truth_matrices(word: str) -> np.ndarray:
@@ -194,6 +215,12 @@ def load_ground_truth_matrices(word: str) -> np.ndarray:
         if not os.path.exists(npz_path):
             raise FileNotFoundError(f"ไม่พบ Ground Truth ของคำว่า '{word}'")
         data = np.load(npz_path, allow_pickle=True)
+        file_version = _read_feature_version(data)
+        if file_version != FEATURE_VERSION:
+            raise StaleGroundTruthError(
+                f"Ground Truth ของคำว่า '{word}' เป็น feature เวอร์ชัน {file_version} "
+                f"แต่ระบบใช้เวอร์ชัน {FEATURE_VERSION} กรุณากดสร้าง Ground Truth ใหม่"
+            )
         _gt_cache[word] = data["feature_matrices"]
     return _gt_cache[word]
 
@@ -211,19 +238,24 @@ def save_ground_truth_sample(word: str, feature_matrix: np.ndarray) -> int:
     existing_matrices = []
     if os.path.exists(npz_path):
         old_data = np.load(npz_path, allow_pickle=True)
-        if "feature_matrices" in old_data:
+        # ตัวอย่างเก่าที่เป็น feature คนละเวอร์ชันเอามารวมไม่ได้ (เทียบกันไม่ได้) ทิ้งแล้วเริ่มใหม่
+        if "feature_matrices" in old_data and _read_feature_version(old_data) == FEATURE_VERSION:
             existing_matrices = list(old_data["feature_matrices"])
 
     feature_matrices = existing_matrices + [feature_matrix]
     np.savez_compressed(
         npz_path,
         feature_matrices=np.array(feature_matrices, dtype=object),
+        feature_version=FEATURE_VERSION,
     )
 
     _gt_cache.pop(word, None)  # เคลียร์ cache กันอ่านของเก่าซ้ำในคำขอถัดไป
     return len(feature_matrices)
 
 
+# 🔑 CORE: เลือกคะแนนที่ดีที่สุดจากตัวอย่าง Ground Truth ทุกตัว
+# ทำไม: คำเดียวกันทำท่าได้หลายแบบเล็กน้อย (มุมกล้อง/สไตล์คนละคน) ถ้ามี Ground Truth
+# หลายตัวอย่าง ผู้ใช้ควรผ่านถ้าทำเหมือน "ตัวอย่างใดตัวอย่างหนึ่ง" ก็พอ ไม่ต้องเหมือนทุกตัว
 def compare_to_word(user_feature_matrix: np.ndarray, word: str, threshold: float = 0.15) -> dict:
     feature_matrices = load_ground_truth_matrices(word)
 
