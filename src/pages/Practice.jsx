@@ -18,7 +18,7 @@ const PREDICT_WINDOW_MS = 3000;       // เก็บ buffer ย้อนหล�
 const BUFFER_PUSH_INTERVAL_MS = 100;  // ความถี่เก็บเฟรมเข้า buffer (~10fps พอสำหรับ DTW)
 
 const STEPS = [
-    { n: 1, label: "ดูตัวอย่างท่า" },
+    { n: 1, label: "ดูตัวอย่างท่าภาษามือ" },
     { n: 2, label: "ฝึกและดูผลลัพธ์" },
 ];
 
@@ -535,7 +535,7 @@ export default function Practice() {
                 <p className="text-sm text-gray-500">{targetWord} · ID {id}</p>
                 <h1 className="text-3xl font-bold text-gray-800 mt-1">ฝึกท่าทางภาษามือ</h1>
                 <p className="text-lg mt-1 text-gray-600">
-                    คำที่กำลังฝึก: <span className="font-bold text-blue-600">{targetWord}</span>
+                    คำศัพท์ : <span className="font-bold text-blue-600">{targetWord}</span>
                 </p>
 
                 {/* Step indicator — ขั้นแรกชิดซ้าย ขั้นสุดท้ายชิดขวา เส้นเชื่อมยืดเต็มพื้นที่ตรงกลาง */}
@@ -571,10 +571,10 @@ export default function Practice() {
 
                 {/* ขั้นที่ 1: ดูตัวอย่าง */}
                 <div className={step === 1 ? "max-w-2xl mx-auto space-y-6" : "hidden"}>
-                    {/* วิดีโอตัวอย่างท่า */}
+                    {/* วิดีโอตัวอย่างท่าภาษามือ */}
                     <div className="bg-white rounded-2xl shadow-md p-5">
-                        <h2 className="text-lg font-bold text-gray-800">วิดีโอตัวอย่างท่า</h2>
-                        <p className="text-sm text-gray-500 mb-3">ท่ามือสำหรับคำว่า "{targetWord}"</p>
+                        <h2 className="text-lg font-bold text-gray-800">วิดีโอตัวอย่างท่าภาษามือ</h2>
+                        <p className="text-sm text-gray-500 mb-3">ท่าภาษามือสำหรับคำว่า " {targetWord} "</p>
 
                         <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
                             {videoUrl && !dbVideoFailed ? (
@@ -616,9 +616,9 @@ export default function Practice() {
                         )}
                     </div>
 
-                    {/* วิธีทำท่ามือ */}
+                    {/* วิธีฝึกท่าทางภาษามือ */}
                     <div className="bg-white rounded-2xl shadow-md p-5">
-                        <h2 className="text-lg font-bold text-gray-800 mb-3">วิธีทำท่ามือ</h2>
+                        <h2 className="text-lg font-bold text-gray-800 mb-3">วิธีฝึกท่าทางภาษามือ</h2>
                         <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
                             <li>วางมือทั้งสองข้างบริเวณหน้าอก นิ้วชิดกันเล็กน้อย</li>
                             <li>ก้มศีรษะเล็กน้อยพร้อมโค้งมือลงหน้าอก 2-3 ครั้ง</li>
@@ -635,7 +635,7 @@ export default function Practice() {
                             }}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition"
                         >
-                            ถัดไป: เริ่มฝึก →
+                            เริ่มฝึกท่าภาษามือ →
                         </button>
                     </div>
                 </div>
@@ -647,7 +647,7 @@ export default function Practice() {
                             <div>
                                 <h2 className="text-lg font-bold text-gray-800">ฝึกท่ากับกล้อง</h2>
                                 <p className="text-sm text-gray-500">
-                                    ทำท่ามือคำว่า "{targetWord}" ให้เหมือนตัวอย่างมากที่สุด
+                                    ทำท่าภาษามือคำว่า " {targetWord} " ให้เหมือนตัวอย่างมากที่สุด
                                 </p>
                             </div>
                             <button
@@ -658,7 +658,7 @@ export default function Practice() {
                                 <span className="flex items-center justify-center w-10 h-7 rounded-md bg-gray-800 text-white text-[10px]">
                                     ▶
                                 </span>
-                                ดูวิดีโอตัวอย่างอีกครั้ง
+                                ดูวิดีโอตัวอย่างท่าภาษามืออีกครั้ง
                             </button>
                         </div>
 
@@ -733,13 +733,13 @@ export default function Practice() {
                                 </div>
                             </div>
 
-                            {/* วงแหวนความใกล้เคียงแบบ real-time — ค่ากลับเป็น 0% เองตอนมือหลุดเฟรม */}
-                            <div className="flex flex-col items-center gap-2 md:px-6">
+                            {/* กราฟวัดความใกล้เคียงแบบ real-time — ค่ากลับเป็น 0% เองตอนมือหลุดเฟรม */}
+                            <div className="flex flex-col items-center gap-2 md:px-6 -translate-y-10">
                                 <ScoreRing
                                     percent={livePercent}
                                     colorClass={prediction ? "stroke-green-500" : "stroke-orange-400"}
                                 />
-                                <p className="text-xs text-gray-500">ความใกล้เคียงของท่า</p>
+                                <p className="text-xs text-gray-500">ความใกล้เคียงของท่าภาษามือ</p>
                             </div>
                         </div>
                     </div>
@@ -786,8 +786,8 @@ export default function Practice() {
                                     </span>
                                     <h3 className="text-lg font-bold text-gray-800">
                                         {compareResult.is_pass
-                                            ? "เยี่ยมมาก! ท่ามือของคุณใกล้เคียงกับ Ground Truth มาก"
-                                            : "ยังไม่ผ่าน ลองดูวิดีโอตัวอย่างแล้วบันทึกท่าอีกครั้ง"}
+                                            ? "เยี่ยมมาก! ท่าภาษามือของคุณใกล้เคียงกับวิดีโอตัวอย่างมาก"
+                                            : "ยังไม่ผ่าน ดูวิดีโอตัวอย่างแล้วบันทึกท่าภาษามืออีกครั้ง"}
                                     </h3>
                                     {/* ผ่านเมื่อ best_score <= threshold ซึ่งตามสูตรแปลง % ใน backend ตรงกับ 50% พอดี */}
                                     <p className="text-xs text-gray-500 mt-1">

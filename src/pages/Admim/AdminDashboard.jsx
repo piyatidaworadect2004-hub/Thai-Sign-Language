@@ -309,7 +309,7 @@ export default function AdminDashboard() {
 
   const cancelEditLesson = () => setEditingLesson(null);
 
-  // แก้ไขคำศัพท์ทั้งแถว (คำ / หมวดหมู่ / วิธีทำท่า / วิดีโอ) ผ่าน PUT /lessons/{id}
+  // แก้ไขคำศัพท์ทั้งแถว (คำ / หมวดหมู่ / วิธีฝึกท่าทางภาษามือ / วิดีโอ) ผ่าน PUT /lessons/{id}
   const saveEditLesson = async () => {
     if (!editingLesson) return;
     if (!editingLesson.title.trim()) {
@@ -939,7 +939,7 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     </Field>
-                    <Field label="วิธีทำท่า">
+                    <Field label="วิธีฝึกท่าทางภาษามือ">
                       <textarea
                         placeholder="คำอธิบาย (ไม่บังคับ)"
                         value={newLessonDescription}
@@ -1494,7 +1494,7 @@ export default function AdminDashboard() {
                     ))}
                   </select>
                 </Field>
-                <Field label="วิธีทำท่า">
+                <Field label="วิธีฝึกท่าทางภาษามือ">
                   <textarea
                     rows={4}
                     value={editingLesson.description}
