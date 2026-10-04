@@ -56,6 +56,14 @@ def _save_practice_log(
 ) -> Optional[int]:
     """รันใน threadpool เพราะ db.commit() เป็น network I/O แบบ blocking (sync SQLAlchemy)"""
     try:
+        # lesson_id ที่ไม่ตรงกับบทเรียนจริง (ไม่ได้ส่งมา / บทเรียนถูกลบแล้วสร้างใหม่) ทำให้ log หาหมวดไม่เจอ
+        # → หาบทเรียนจากชื่อคำแทน (backend ใช้ lesson.title เป็นชื่อคำอยู่แล้ว)
+        lesson_exists = lesson_id.isdigit() and db.query(Lesson.id).filter(Lesson.id == int(lesson_id)).first()
+        if not lesson_exists:
+            by_title = db.query(Lesson.id).filter(Lesson.title == word).first()
+            if by_title:
+                lesson_id = str(by_title.id)
+
         new_log = PracticeLog(
             user_id=current_user.id,
             lesson_id=lesson_id,
@@ -92,7 +100,7 @@ def get_optional_current_user(
 @router.post("/compare")
 async def compare_practice_video(
     word: str = Form(...),
-    lesson_id: str = Form("1"),
+    lesson_id: str = Form(""),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user),

@@ -68,6 +68,31 @@ def get_my_progress_overview(
     return _build_overview(current_user.id, db)
 
 
+@router.get("/me/summary")
+def get_my_practice_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    สรุปการฝึกทั้งหมดของ user (ทุกครั้ง ไม่จำกัด 50 รายการแบบ /progress)
+    accuracy_percentage = ครั้งที่ทำท่าถูก (is_correct) / ครั้งที่ฝึกทั้งหมด
+    log ที่ไม่มีผลตรวจ (is_correct เป็น NULL) นับเป็นไม่ผ่าน
+    """
+    total, correct = (
+        db.query(
+            func.count(PracticeLog.id),
+            func.count(PracticeLog.id).filter(PracticeLog.is_correct == True),
+        )
+        .filter(PracticeLog.user_id == current_user.id)
+        .one()
+    )
+    return {
+        "total_practiced": total,
+        "total_correct": correct,
+        "accuracy_percentage": round(correct / total * 100, 1) if total else 0,
+    }
+
+
 @router.get("/user/{user_id}/overview")
 def get_progress_overview(
     user_id: int,

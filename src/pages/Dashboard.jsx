@@ -190,7 +190,7 @@ function HeroRing({ percent, size = 96, stroke = 8 }) {
 
 export default function Dashboard() {
     const [progressData, setProgressData] = useState([]);
-    const [stats, setStats] = useState({ totalPracticed: 0, avgConfidence: 0 });
+    const [stats, setStats] = useState({ totalPracticed: 0, totalCorrect: 0, accuracy: 0 });
     const [categoryOverview, setCategoryOverview] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openTables, setOpenTables] = useState({});
@@ -208,17 +208,22 @@ export default function Dashboard() {
                 });
 
                 if (response.ok) {
-                    const data = await response.json();
-                    setProgressData(data);
+                    setProgressData(await response.json());
+                }
 
-                    const total = data.length;
-                    const avgConf = total > 0
-                        ? data.reduce((acc, curr) => acc + (curr.confidence || 0), 0) / total
-                        : 0;
-
+                // สรุปจากการฝึก "ทุกครั้ง" (/progress คืนแค่ 50 รายการล่าสุด ใช้ทำประวัติ/กราฟเท่านั้น)
+                // % = ครั้งที่ทำท่าถูก / ครั้งที่ฝึกทั้งหมด
+                const summaryRes = await fetch("http://localhost:8000/progress/me/summary", {
+                    headers: {
+                        ...(token && { Authorization: `Bearer ${token}` })
+                    }
+                });
+                if (summaryRes.ok) {
+                    const summary = await summaryRes.json();
                     setStats({
-                        totalPracticed: total,
-                        avgConfidence: (avgConf * 100).toFixed(1)
+                        totalPracticed: summary.total_practiced,
+                        totalCorrect: summary.total_correct,
+                        accuracy: summary.accuracy_percentage,
                     });
                 }
 
@@ -243,7 +248,7 @@ export default function Dashboard() {
 
     // จัดกลุ่มประวัติตามหมวดหมู่ — คงลำดับตาม created_at desc เดิมไว้ (กลุ่มที่ฝึกล่าสุดขึ้นก่อน)
     const groupedHistory = progressData.reduce((groups, item) => {
-        const key = item.category_name || "ไม่ทราบหมวดหมู่";
+        const key = item.category_name || "หมวดอื่นๆ";
         let group = groups.find((g) => g.category_name === key);
         if (!group) {
             group = { category_name: key, items: [] };
@@ -280,7 +285,7 @@ export default function Dashboard() {
                         </h1>
                         <p className="text-blue-100 text-sm mt-2 max-w-md">
                             {stats.totalPracticed > 0
-                                ? `คุณฝึกไปแล้ว ${stats.totalPracticed} ครั้ง ความใกล้เคียงของท่าเฉลี่ยอยู่ที่ ${stats.avgConfidence}% ฝึกต่อเพื่อพัฒนาทักษะให้ดียิ่งขึ้น`
+                                ? `คุณฝึกไปแล้ว ${stats.totalPracticed} ครั้ง ทำท่าถูกต้อง ${stats.totalCorrect} ครั้ง คิดเป็น ${stats.accuracy}% ฝึกต่อเพื่อพัฒนาทักษะให้ดียิ่งขึ้น`
                                 : "ยังไม่มีประวัติการฝึกซ้อม เริ่มต้นฝึกคำแรกกันเลย!"}
                         </p>
                         <button
@@ -292,8 +297,8 @@ export default function Dashboard() {
                     </div>
 
                     <div className="self-center sm:self-auto bg-white/10 rounded-2xl px-6 py-5 flex flex-col items-center gap-2">
-                        <HeroRing percent={stats.avgConfidence} />
-                        <p className="text-xs text-blue-100">ความใกล้เคียงเฉลี่ย</p>
+                        <HeroRing percent={stats.accuracy} />
+                        <p className="text-xs text-blue-100">ทำท่าถูกต้อง {stats.totalCorrect}/{stats.totalPracticed} ครั้ง</p>
                     </div>
                 </section>
 

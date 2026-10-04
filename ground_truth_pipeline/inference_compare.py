@@ -49,7 +49,7 @@ def compare_sequences(user_matrix: np.ndarray, gt_matrix: np.ndarray) -> dict:
     }
 
 
-def compare_to_word(user_feature_matrix, word, gt_dir, threshold=0.05):
+def compare_to_word(user_feature_matrix, word, gt_dir, threshold=0.15):
     npz_path = os.path.join(gt_dir, f"{word}.npz")
     if not os.path.exists(npz_path):
         raise FileNotFoundError(f"ไม่พบ Ground Truth ของคำว่า '{word}' ที่ {npz_path}")
@@ -154,7 +154,7 @@ def main():
     parser.add_argument("--gt_dir", default="gt_data")
     parser.add_argument("--video", default=None)
     parser.add_argument("--webcam", action="store_true")
-    parser.add_argument("--threshold", type=float, default=0.05,
+    parser.add_argument("--threshold", type=float, default=0.15,
                         help="ต้องตรงกับ DEFAULT_THRESHOLD ใน backend/app/sign_engine/engine.py")
     parser.add_argument("--pose-model", default="pose_landmarker.task")
     parser.add_argument("--hand-model", default="hand_landmarker.task")

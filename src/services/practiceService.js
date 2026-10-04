@@ -50,7 +50,8 @@ export function isSaved(history, word) {
 export async function saveAfterPractice({ word, lessonId, videoBlob }) {
   const formData = new FormData();
   formData.append("word", word);
-  formData.append("lesson_id", lessonId || "1");
+  // ไม่มี lessonId ให้ส่งค่าว่าง แล้ว backend จะหาบทเรียนจากชื่อคำเอง (เดิมใส่ "1" ซึ่งไม่ใช่บทเรียนจริง)
+  formData.append("lesson_id", lessonId || "");
   formData.append("file", videoBlob, "practice.webm");
 
   const res = await fetch(`${API_URL}/practice-compare/compare`, {

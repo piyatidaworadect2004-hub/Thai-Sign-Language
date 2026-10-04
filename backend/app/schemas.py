@@ -63,7 +63,9 @@ class CategoryBase(BaseModel):
 class CategoryOut(CategoryBase):
     id: int
     lessons: List[LessonOut] = []          # ★ เพิ่ม: รายการคำศัพท์ในหมวดนี้
-    progress: int = 0                       # ★ เพิ่ม: completion_percentage ของ user ที่ login อยู่ (0 ถ้ายังไม่ login/ยังไม่ฝึก)
+    # completion_percentage ของ user ที่ login อยู่ (0 ถ้ายังไม่ login/ยังไม่ฝึก)
+    # เป็น float เพราะ _build_overview ปัดทศนิยม 2 ตำแหน่ง (เช่น 1/3 คำ = 33.33) ถ้าเป็น int จะ validate ไม่ผ่าน → 500
+    progress: float = 0
 
     model_config = ConfigDict(from_attributes=True)
 
