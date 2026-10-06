@@ -21,27 +21,46 @@ const CATEGORY_BAR_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg
 const SERIES_COMPLETION = '#2a78d6';
 const SERIES_CORRECTNESS = '#eb6834';
 
+// ★ อ่านข้อความ error จาก response ให้ละเอียด (status + detail) ใช้โชว์ใน alert
+async function readError(res, fallback) {
+  let msg = `${fallback} (HTTP ${res.status})`;
+  try {
+    const errData = await res.json();
+    if (errData && errData.detail) {
+      msg += `: ${typeof errData.detail === 'string' ? errData.detail : JSON.stringify(errData.detail)}`;
+    }
+  } catch {
+    /* response ไม่ใช่ JSON */
+  }
+  return msg;
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
   const [lessons, setLessons] = useState([]);
-  const [categories, setCategories] = useState([]); // ★ เพิ่ม: ใช้ทำ dropdown เลือกหมวดหมู่
+  const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
   const [reportUserId, setReportUserId] = useState('');
   const [loginLogs, setLoginLogs] = useState([]);
 
-  // ★ เพิ่ม: ฟอร์ม + ค้นหา สำหรับแท็บ "จัดการบทเรียน" (หมวดหมู่)
+  // ฟอร์ม + ค้นหา สำหรับแท็บ "จัดการบทเรียน" (หมวดหมู่)
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryLevel, setNewCategoryLevel] = useState('ง่าย');
   const [newCategoryDescription, setNewCategoryDescription] = useState('');
   const [addingCategory, setAddingCategory] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
 
-  // ★ เพิ่ม: ค้นหา/กรอง สำหรับตารางผู้ใช้และคำศัพท์
+  // ★ แก้ไขคำอธิบายหมวดหมู่
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editingDescription, setEditingDescription] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
+
+  // ค้นหา/กรอง สำหรับตารางผู้ใช้
   const [userSearch, setUserSearch] = useState('');
 
   useEffect(() => {
@@ -69,7 +88,6 @@ export default function AdminDashboard() {
         setLessons(lessonsData);
       }
 
-      // ★ เพิ่ม: ดึงข้อมูลหมวดหมู่ ใช้ทำ dropdown ตอนเพิ่มบทเรียน + โชว์ชื่อหมวดในตาราง
       const categoriesRes = await fetch('http://127.0.0.1:8000/categories', { headers });
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
@@ -82,14 +100,14 @@ export default function AdminDashboard() {
         setUsers(usersData);
       }
 
-      // ★ เพิ่ม: โหลด login logs แบบเงียบๆ ไว้ล่วงหน้า ใช้โชว์เป็น "กิจกรรมล่าสุด" ในแดชบอร์ด
+      // โหลด login logs แบบเงียบๆ ไว้ล่วงหน้า ใช้โชว์เป็น "กิจกรรมล่าสุด" ในแดชบอร์ด
       fetchLoginLogsData();
     } catch (error) {
       console.error('Error fetching admin data:', error);
     }
   };
 
-  // ★ แยกออกจาก handleOpenLoginLogs เดิม: ไม่ alert ไม่สลับแท็บ ใช้โหลดแบบพื้นหลังสำหรับแดชบอร์ด
+  // ไม่ alert ไม่สลับแท็บ ใช้โหลดแบบพื้นหลังสำหรับแดชบอร์ด
   const fetchLoginLogsData = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -124,7 +142,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // ★ เพิ่มใหม่: เพิ่มหมวดหมู่บทเรียน (ใช้ POST /categories/ ที่ backend มีอยู่แล้วแต่ยังไม่เคยมี UI)
+  // เพิ่มหมวดหมู่บทเรียน (POST /categories/)
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
       alert('กรุณากรอกชื่อหมวดหมู่');
@@ -156,14 +174,55 @@ export default function AdminDashboard() {
         setNewCategoryDescription('');
         fetchAllData();
       } else {
-        const errData = await res.json();
-        alert(errData.detail || 'เพิ่มหมวดหมู่ไม่สำเร็จ');
+        alert(await readError(res, 'เพิ่มหมวดหมู่ไม่สำเร็จ'));
       }
     } catch (error) {
       console.error('Error adding category:', error);
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     } finally {
       setAddingCategory(false);
+    }
+  };
+
+  // ★ แก้ไขคำอธิบายหมวดหมู่ (PATCH /categories/{id}/description)
+  const startEditDescription = (cat) => {
+    setEditingCategoryId(cat.id);
+    setEditingDescription(cat.description || '');
+  };
+
+  const cancelEditDescription = () => {
+    setEditingCategoryId(null);
+    setEditingDescription('');
+  };
+
+  const handleSaveDescription = async (categoryId) => {
+    setSavingDescription(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://127.0.0.1:8000/categories/${categoryId}/description`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ description: editingDescription.trim() }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCategories((prev) =>
+          prev.map((c) => (c.id === categoryId ? { ...c, description: data.description } : c))
+        );
+        cancelEditDescription();
+      } else {
+        // ★ โชว์ status + detail เพื่อให้รู้สาเหตุทันที (เช่น 403/404/405/422)
+        alert(await readError(res, 'แก้ไขคำอธิบายไม่สำเร็จ'));
+      }
+    } catch (error) {
+      console.error('Error updating description:', error);
+      alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ตรวจว่า backend รันอยู่ที่ 127.0.0.1:8000)');
+    } finally {
+      setSavingDescription(false);
     }
   };
 
@@ -217,8 +276,7 @@ export default function AdminDashboard() {
         alert(newRole === 'admin' ? 'อัปเดตสิทธิ์เป็น Admin สำเร็จ' : 'ลดสิทธิ์กลับเป็น User สำเร็จ');
         fetchAllData();
       } else {
-        const errData = await res.json();
-        alert(errData.detail || 'อัปเดตสิทธิ์ไม่สำเร็จ');
+        alert(await readError(res, 'อัปเดตสิทธิ์ไม่สำเร็จ'));
       }
     } catch (error) {
       console.error('Error updating user role:', error);
@@ -262,7 +320,7 @@ export default function AdminDashboard() {
   const adminCount = users.filter((u) => u.role === 'admin').length;
   const recentUsers = [...users].sort((a, b) => b.id - a.id).slice(0, 5);
 
-  // รายงาน: นับผู้ใช้ "ไม่ซ้ำ" ที่เข้าสู่ระบบในแต่ละเดือน จาก login log ที่ backend ส่งมา (ล่าสุด 200 รายการ)
+  // รายงาน: นับผู้ใช้ "ไม่ซ้ำ" ที่เข้าสู่ระบบในแต่ละเดือน จาก login log (ล่าสุด 200 รายการ)
   const monthlyLogins = Object.values(
     loginLogs.reduce((acc, log) => {
       if (!log.login_time) return acc;
@@ -602,7 +660,45 @@ export default function AdminDashboard() {
                                 {active}/{total} คำ
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-gray-500">{cat.description || '-'}</td>
+                            <td className="px-4 py-3 text-gray-500">
+                              {editingCategoryId === cat.id ? (
+                                <div className="flex flex-col gap-2 min-w-[240px]">
+                                  <textarea
+                                    value={editingDescription}
+                                    onChange={(e) => setEditingDescription(e.target.value)}
+                                    rows={2}
+                                    autoFocus
+                                    className={INPUT}
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleSaveDescription(cat.id)}
+                                      disabled={savingDescription}
+                                      className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-60 transition"
+                                    >
+                                      {savingDescription ? 'กำลังบันทึก...' : 'บันทึก'}
+                                    </button>
+                                    <button
+                                      onClick={cancelEditDescription}
+                                      disabled={savingDescription}
+                                      className="px-3 py-1 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+                                    >
+                                      ยกเลิก
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-start justify-between gap-3">
+                                  <span>{cat.description || '-'}</span>
+                                  <button
+                                    onClick={() => startEditDescription(cat)}
+                                    className="shrink-0 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition whitespace-nowrap"
+                                  >
+                                    ✏️ แก้ไข
+                                  </button>
+                                </div>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -744,7 +840,7 @@ export default function AdminDashboard() {
                       </svg>
                     </div>
 
-                    {/* table view — ตัวเลขจริงครบทุกหมวด (ไม่ต้องพึ่งกราฟอย่างเดียว) */}
+                    {/* table view — ตัวเลขจริงครบทุกหมวด */}
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-sm">
                         <thead>
