@@ -1,0 +1,17 @@
+{
+  "label": "โกรธ",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "โกรธ 1.MOV",
+    "โกรธ 2.MOV",
+    "โกรธ 3.MOV"
+  ],
+  "frames_per_sample": [
+    93,
+    79,
+    81
+  ]
+}

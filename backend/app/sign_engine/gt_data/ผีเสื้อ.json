@@ -1,0 +1,17 @@
+{
+  "label": "ผีเสื้อ",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "ผีเสื้อ1.mov",
+    "ผีเสื้อ2.mov",
+    "ผีเสื้อ3.mov"
+  ],
+  "frames_per_sample": [
+    66,
+    68,
+    47
+  ]
+}

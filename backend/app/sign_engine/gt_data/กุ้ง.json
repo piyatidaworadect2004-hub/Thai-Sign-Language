@@ -1,0 +1,17 @@
+{
+  "label": "กุ้ง",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "กุ้ง1.mov",
+    "กุ้ง2.mov",
+    "กุ้ง3.mov"
+  ],
+  "frames_per_sample": [
+    46,
+    47,
+    49
+  ]
+}

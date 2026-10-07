@@ -1,0 +1,17 @@
+{
+  "label": "ใช่",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "ใช่ 1.MOV",
+    "ใช่ 2.MOV",
+    "ใช่ 3.MOV"
+  ],
+  "frames_per_sample": [
+    80,
+    72,
+    79
+  ]
+}

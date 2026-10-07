@@ -1,0 +1,17 @@
+{
+  "label": "งู",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "งู 1.MOV",
+    "งู 2.MOV",
+    "งู 3.MOV"
+  ],
+  "frames_per_sample": [
+    84,
+    83,
+    85
+  ]
+}

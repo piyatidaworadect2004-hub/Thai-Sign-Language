@@ -1,0 +1,17 @@
+{
+  "label": "กวาง",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "กวาง 1.MOV",
+    "กวาง 2.MOV",
+    "กวาง 3.MOV"
+  ],
+  "frames_per_sample": [
+    70,
+    102,
+    85
+  ]
+}

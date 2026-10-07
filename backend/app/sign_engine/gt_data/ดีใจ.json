@@ -1,0 +1,17 @@
+{
+  "label": "ดีใจ",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "ดีใจ 1.MOV",
+    "ดีใจ 2.MOV",
+    "ดีใจ 3.MOV"
+  ],
+  "frames_per_sample": [
+    87,
+    107,
+    81
+  ]
+}

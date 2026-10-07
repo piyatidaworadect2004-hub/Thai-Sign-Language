@@ -1,0 +1,17 @@
+{
+  "label": "น้อง",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "น้อง 1.MOV",
+    "น้อง 2.MOV",
+    "น้อง 3.MOV"
+  ],
+  "frames_per_sample": [
+    78,
+    78,
+    92
+  ]
+}

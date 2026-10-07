@@ -1,0 +1,17 @@
+{
+  "label": "ไม่เป็นไร",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "ไม่เป็นไร 1.MOV",
+    "ไม่เป็นไร 2.MOV",
+    "ไม่เป็นไร 3.MOV"
+  ],
+  "frames_per_sample": [
+    89,
+    84,
+    91
+  ]
+}

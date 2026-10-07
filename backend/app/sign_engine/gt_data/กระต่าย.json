@@ -1,0 +1,17 @@
+{
+  "label": "กระต่าย",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "กระต่าย 1.MOV",
+    "กระต่าย 2.MOV",
+    "กระต่าย 3.MOV"
+  ],
+  "frames_per_sample": [
+    106,
+    89,
+    87
+  ]
+}

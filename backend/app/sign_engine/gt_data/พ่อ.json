@@ -1,0 +1,17 @@
+{
+  "label": "พ่อ",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "พ่อ 1.MOV",
+    "พ่อ 2.MOV",
+    "พ่อ 3.MOV"
+  ],
+  "frames_per_sample": [
+    69,
+    75,
+    88
+  ]
+}

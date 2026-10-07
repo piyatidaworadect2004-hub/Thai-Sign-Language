@@ -1,0 +1,17 @@
+{
+  "label": "พี่สาว",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "พี่สาว 1.MOV",
+    "พี่สาว 2.MOV",
+    "พี่สาว 3.MOV"
+  ],
+  "frames_per_sample": [
+    100,
+    108,
+    113
+  ]
+}

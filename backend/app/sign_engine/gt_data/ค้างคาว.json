@@ -1,0 +1,17 @@
+{
+  "label": "ค้างคาว",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "ค้างคาว 1.MOV",
+    "ค้างคาว 2.MOV",
+    "ค้างคาว 3.MOV"
+  ],
+  "frames_per_sample": [
+    140,
+    121,
+    74
+  ]
+}

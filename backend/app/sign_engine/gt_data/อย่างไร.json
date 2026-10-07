@@ -1,0 +1,17 @@
+{
+  "label": "อย่างไร",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "อย่างไร 1.MOV",
+    "อย่างไร 2.MOV",
+    "อย่างไร 3.MOV"
+  ],
+  "frames_per_sample": [
+    76,
+    70,
+    81
+  ]
+}

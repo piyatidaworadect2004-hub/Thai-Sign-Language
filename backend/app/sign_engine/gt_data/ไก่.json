@@ -1,0 +1,23 @@
+{
+  "label": "ไก่",
+  "num_samples": 6,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "กวาง 1.MOV",
+    "กวาง 2.MOV",
+    "กวาง 3.MOV",
+    "ไก่1.mov",
+    "ไก่2.mov",
+    "ไก่3.mov"
+  ],
+  "frames_per_sample": [
+    70,
+    102,
+    85,
+    48,
+    54,
+    39
+  ]
+}

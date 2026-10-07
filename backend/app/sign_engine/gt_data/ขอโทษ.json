@@ -1,0 +1,17 @@
+{
+  "label": "ขอโทษ",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "ขอโทษ 1.MOV",
+    "ขอโทษ 2.MOV",
+    "ขอโทษ 3.MOV"
+  ],
+  "frames_per_sample": [
+    111,
+    107,
+    88
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "label": "พี่ชาย",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "พี่ชาย 1.MOV",
+    "พี่ชาย 2.MOV",
+    "พี่ชาย 3.MOV"
+  ],
+  "frames_per_sample": [
+    93,
+    96,
+    107
+  ]
+}

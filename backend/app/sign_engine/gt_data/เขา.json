@@ -1,0 +1,17 @@
+{
+  "label": "เขา",
+  "num_samples": 3,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "เขา 1.MOV",
+    "เขา 2.MOV",
+    "เขา 3.MOV"
+  ],
+  "frames_per_sample": [
+    85,
+    81,
+    84
+  ]
+}
