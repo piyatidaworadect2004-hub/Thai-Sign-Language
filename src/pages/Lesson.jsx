@@ -35,7 +35,7 @@ export default function Lesson() {
           onClick={() => navigate("/home")}
           className="bg-gray-500 text-white px-5 py-2 rounded-xl mb-6 hover:bg-gray-600 transition shadow"
         >
-          ← กลับหน้าหลัก
+          ← กลับ
         </button>
       </div>
 

@@ -53,21 +53,19 @@ export default function LessonList() {
 
     return (
         <div className="min-h-screen bg-sky-100 p-8">
-            {selectedCategoryId && (
-                <button
-                    onClick={() => navigate("/home")}
-                    className="bg-gray-500 text-white px-5 py-2 rounded-xl mb-6 hover:bg-gray-600 transition"
-                >
-                    ← กลับหน้าหลัก
-                </button>
-            )}
+            <button
+                onClick={() => navigate("/home")}
+                className="bg-gray-500 text-white px-5 py-2 rounded-xl mb-6 hover:bg-gray-600 transition"
+            >
+                ← กลับ
+            </button>
 
             <h1 className="text-4xl font-bold text-gray-800 mb-2">
                 {selectedCategoryId
                     ? location.state?.categoryTitle || "คำศัพท์ในหมวดนี้"
-                    : "รายการบทเรียนภาษามือ"}
+                    : "บทเรียนภาษามือ"}
             </h1>
-            <p className="text-lg text-gray-600 mb-8">เลือกคำศัพท์ที่คุณต้องการฝึกซ้อม</p>
+            <p className="text-lg text-gray-600 mb-8">เลือกบทเรียนที่คุณต้องการ</p>
 
             {displayedCategories.length === 0 ? (
                 <div className="bg-white rounded-2xl shadow-md p-6 text-center max-w-md mx-auto">

@@ -618,13 +618,17 @@ export default function Practice() {
 
                     {/* วิธีฝึกท่าทางภาษามือ */}
                     <div className="bg-white rounded-3xl p-6 shadow">
-                        <h3 className="font-bold text-lg mb-3">วิธีฝึกท่าทางภาษามือ</h3>
+                        <h3 className="font-bold text-lg mb-3">วิธีการใช้กล้องฝึกท่าทางภาษามือ</h3>
                         {instructions ? (
                             <p className="whitespace-pre-line text-gray-700 leading-8">
                                 {instructions}
                             </p>
                         ) : (
-                            <p className="text-sm text-gray-400">ยังไม่มีคำอธิบายวิธีทำท่าสำหรับคำนี้</p>
+                            <p className="text-sm text-gray-400">
+                                1. จัดตำแหน่งให้เห็นฝ่ามือชัด มีแสงสว่างเพียงพอ <br />
+                                2. กดปุ่ม "เริ่มฝึกท่าภาษามือ" เพื่อบึนทึกวิดีโอการฝึกซ้อม <br />
+                                3. ระบบจะตรวจสอบความเหมือนของท่าภาษามือของผู้ใช้กับวิดีโอตัวอย่าง และแสดงผลลัพธ์ให้ทราบ
+                            </p>
                         )}
                     </div>
                     <div className="flex justify-end">
@@ -635,7 +639,7 @@ export default function Practice() {
                             }}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition"
                         >
-                            เริ่มฝึกท่าภาษามือ →
+                            เริ่มฝึกท่าทางภาษามือ →
                         </button>
                     </div>
                 </div>
@@ -719,7 +723,7 @@ export default function Practice() {
                                             ? "กำลังอัด..."
                                             : isComparing
                                                 ? "กำลังตรวจสอบ..."
-                                                : "เริ่มฝึกท่าทาง"}
+                                                : "เริ่มฝึกท่าทางภาษามือ"}
                                     </button>
                                 </div>
 
