@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Float, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint, Float, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -41,6 +41,7 @@ class Lesson(Base):
     category_id = Column(Integer, ForeignKey("category.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
+    # instructions = Column(Text, nullable=True)   # ★ เพิ่ม: วิธีทำท่า แสดงในหน้าวิดีโอ
     video_url = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, default=False)   # ★ เพิ่ม: คำนี้ AI ตรวจจับได้จริงหรือยัง
 

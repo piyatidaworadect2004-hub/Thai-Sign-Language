@@ -57,9 +57,11 @@ const emptyPanel = (categoryId = '') => ({
   title: '',
   category_id: categoryId,
   description: '',
+  instructions: '',
   video_url: '',
   original_video_url: '',
 });
+
 
 function GtBadge({ gt, hasVideo, unknown }) {
   if (unknown) {
@@ -169,6 +171,7 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
       title: lesson.title,
       category_id: lesson.category_id,
       description: lesson.description || '',
+      instructions: lesson.instructions || '',
       video_url: lesson.video_url || '',
       original_video_url: lesson.video_url || '',
     });
@@ -258,6 +261,7 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
         title: panel.title.trim(),
         category_id: Number(panel.category_id),
         description: panel.description.trim() || null,
+        instructions: panel.instructions.trim() || null,
         video_url: videoUrl || null,
       };
       const res = await fetch(panel.mode === 'new' ? `${API}/lessons` : `${API}/lessons/${panel.id}`, {
@@ -303,6 +307,7 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
         title: saved.title,
         category_id: saved.category_id,
         description: saved.description || '',
+        instructions: saved.instructions || '',
         video_url: videoUrl,
         original_video_url: videoUrl,
       });
@@ -443,9 +448,8 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
                         <button
                           onClick={(e) => { e.stopPropagation(); handleToggleActive(lesson); }}
                           title="กดเพื่อเปิด/ปิดการใช้งาน"
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition ${
-                            lesson.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                          }`}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition ${lesson.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            }`}
                         >
                           {lesson.is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
                         </button>
@@ -494,9 +498,8 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
                   <button
                     key={n}
                     onClick={() => setPage(n)}
-                    className={`w-8 h-8 rounded-lg text-sm font-semibold ${
-                      n === currentPage ? 'bg-blue-600 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
+                    className={`w-8 h-8 rounded-lg text-sm font-semibold ${n === currentPage ? 'bg-blue-600 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
                   >
                     {n}
                   </button>
@@ -560,24 +563,32 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
                 ))}
               </select>
             </Field>
-            <Field label="วิธีฝึกท่าทางภาษามือ">
+            <Field label="คำอธิบาย (แสดงบนการ์ด)">
               <textarea
-                rows={3}
-                placeholder="คำอธิบาย (ไม่บังคับ)"
+                rows={2}
+                placeholder="เช่น ฝึกท่าทางภาษามือคำว่า ดีใจ"
                 value={panel.description}
                 onChange={(e) => updatePanel({ description: e.target.value })}
                 disabled={busy}
                 className={INPUT}
               />
             </Field>
-
+            <Field label="วิธีฝึกท่าทางภาษามือ (แสดงในหน้าวิดีโอ)">
+              <textarea
+                rows={4}
+                placeholder={'1. ยกมือทั้งสองข้างระดับอก\n2. ...'}
+                value={panel.instructions}
+                onChange={(e) => updatePanel({ instructions: e.target.value })}
+                disabled={busy}
+                className={INPUT}
+              />
+            </Field>
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-semibold text-gray-600">วิดีโอตัวอย่างท่า (ท่าต้นแบบ)</span>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                    hasExampleVideo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${hasExampleVideo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}
                 >
                   {hasExampleVideo ? 'มีวิดีโอ' : 'ยังไม่มีวิดีโอ'}
                 </span>
@@ -587,9 +598,8 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
                 onDragOver={(e) => { e.preventDefault(); if (!busy) setDragActive(true); }}
                 onDragLeave={() => setDragActive(false)}
                 onDrop={(e) => { e.preventDefault(); setDragActive(false); if (!busy) addClips(e.dataTransfer.files); }}
-                className={`aspect-video rounded-xl overflow-hidden flex items-center justify-center transition ${
-                  dragActive ? 'bg-blue-50 border-2 border-dashed border-blue-500' : 'bg-gray-900'
-                }`}
+                className={`aspect-video rounded-xl overflow-hidden flex items-center justify-center transition ${dragActive ? 'bg-blue-50 border-2 border-dashed border-blue-500' : 'bg-gray-900'
+                  }`}
               >
                 {previewSrc ? (
                   <video key={previewSrc} src={previewSrc} controls className="w-full h-full object-contain" />

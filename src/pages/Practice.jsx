@@ -51,6 +51,7 @@ export default function Practice() {
     const [lessonLoading, setLessonLoading] = useState(!location.state);
     const [nextLesson, setNextLesson] = useState(null);
     const [videoUrl, setVideoUrl] = useState(null);
+    const [instructions, setInstructions] = useState("");
     const [dbVideoFailed, setDbVideoFailed] = useState(false);
 
     const lastPredictTime = useRef(0);
@@ -130,11 +131,15 @@ export default function Practice() {
         let cancelled = false;
 
         async function fetchVideoUrl() {
+            setInstructions("");
             try {
                 const response = await fetch(`http://localhost:8000/lessons/${id}`);
                 if (!response.ok) return;
                 const data = await response.json();
-                if (!cancelled) setVideoUrl(data.video_url || null);
+                if (!cancelled) {
+                    setVideoUrl(data.video_url || null);
+                    setInstructions(data.instructions || "");
+                }
             } catch (error) {
                 console.error("โหลด video_url ไม่สำเร็จ:", error);
             }
@@ -333,9 +338,7 @@ export default function Practice() {
                         canvasRef.current &&
                         handLandmarkerInstance &&
                         poseLandmarkerInstance
-                    )
-
-                    {
+                    ) {
                         const nowMs = performance.now();
                         const results = handLandmarkerInstance.detectForVideo(
                             videoRef.current,
@@ -364,37 +367,37 @@ export default function Practice() {
                             let handRightWorld = null;
 
                             results.landmarks.forEach((landmarks, handIndex) => {
-                            const worldLandmarks = results.worldLandmarks?.[handIndex] || [];
-                            const handedLabel = results.handedness?.[handIndex]?.[0]?.categoryName;
-                            const worldPoints = worldLandmarks.map((p) => ({ x: p.x, y: p.y, z: p.z }));
+                                const worldLandmarks = results.worldLandmarks?.[handIndex] || [];
+                                const handedLabel = results.handedness?.[handIndex]?.[0]?.categoryName;
+                                const worldPoints = worldLandmarks.map((p) => ({ x: p.x, y: p.y, z: p.z }));
 
-                            if (handedLabel === "Left") {
-                                handLeftWorld = worldPoints;
-                            } else if (handedLabel === "Right") {
-                                handRightWorld = worldPoints;
-                            }
+                                if (handedLabel === "Left") {
+                                    handLeftWorld = worldPoints;
+                                } else if (handedLabel === "Right") {
+                                    handRightWorld = worldPoints;
+                                }
 
-                            HAND_CONNECTIONS.forEach(([start, end]) => {
-                                const p1 = landmarks[start];
-                                const p2 = landmarks[end];
+                                HAND_CONNECTIONS.forEach(([start, end]) => {
+                                    const p1 = landmarks[start];
+                                    const p2 = landmarks[end];
 
-                                ctx.beginPath();
-                                ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
-                                ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
-                                ctx.strokeStyle = "#00FF00";
-                                ctx.lineWidth = 4;
-                                ctx.stroke();
-                            });
+                                    ctx.beginPath();
+                                    ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
+                                    ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
+                                    ctx.strokeStyle = "#00FF00";
+                                    ctx.lineWidth = 4;
+                                    ctx.stroke();
+                                });
 
-                            landmarks.forEach((point) => {
-                                ctx.beginPath();
-                                ctx.arc(
-                                    point.x * canvas.width,
-                                    point.y * canvas.height,
-                                    6,
-                                    0,
-                                    2 * Math.PI
-                                );
+                                landmarks.forEach((point) => {
+                                    ctx.beginPath();
+                                    ctx.arc(
+                                        point.x * canvas.width,
+                                        point.y * canvas.height,
+                                        6,
+                                        0,
+                                        2 * Math.PI
+                                    );
                                     ctx.fillStyle = "#FF007F";
                                     ctx.fill();
                                     ctx.strokeStyle = "#FFFFFF";
@@ -449,9 +452,9 @@ export default function Practice() {
                         }
                     }
 
-                        if (isMounted.current) {
-                            animationId = requestAnimationFrame(detectHands);
-                        }
+                    if (isMounted.current) {
+                        animationId = requestAnimationFrame(detectHands);
+                    }
                 }
 
                 detectHands();
@@ -543,20 +546,18 @@ export default function Practice() {
                         <Fragment key={s.n}>
                             <div className="flex items-center gap-2 shrink-0">
                                 <span
-                                    className={`flex items-center justify-center w-7 h-7 shrink-0 rounded-full text-sm font-bold ${
-                                        step > s.n
-                                            ? "bg-green-100 text-green-600"
-                                            : step === s.n
+                                    className={`flex items-center justify-center w-7 h-7 shrink-0 rounded-full text-sm font-bold ${step > s.n
+                                        ? "bg-green-100 text-green-600"
+                                        : step === s.n
                                             ? "bg-blue-600 text-white"
                                             : "bg-gray-200 text-gray-500"
-                                    }`}
+                                        }`}
                                 >
                                     {step > s.n ? "✓" : s.n}
                                 </span>
                                 <span
-                                    className={`text-sm font-semibold ${
-                                        step === s.n ? "text-gray-800" : "text-gray-500"
-                                    }`}
+                                    className={`text-sm font-semibold ${step === s.n ? "text-gray-800" : "text-gray-500"
+                                        }`}
                                 >
                                     {s.label}
                                 </span>
@@ -616,16 +617,16 @@ export default function Practice() {
                     </div>
 
                     {/* วิธีฝึกท่าทางภาษามือ */}
-                    <div className="bg-white rounded-2xl shadow-md p-5">
-                        <h2 className="text-lg font-bold text-gray-800 mb-3">วิธีฝึกท่าทางภาษามือ</h2>
-                        <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
-                            <li>วางมือทั้งสองข้างบริเวณหน้าอก นิ้วชิดกันเล็กน้อย</li>
-                            <li>ก้มศีรษะเล็กน้อยพร้อมโค้งมือลงหน้าอก 2-3 ครั้ง</li>
-                            <li>ทำท่าตามตัวอย่างวิดีโอด้านซ้ายให้ช้าและชัดเจน</li>
-                        </ol>
-                        <p className="text-xs text-gray-400 mt-3">* เนื้อหาตัวอย่าง ยังไม่ใช่ขั้นตอนจริงของทุกคำ</p>
+                    <div className="bg-white rounded-3xl p-6 shadow">
+                        <h3 className="font-bold text-lg mb-3">วิธีฝึกท่าทางภาษามือ</h3>
+                        {instructions ? (
+                            <p className="whitespace-pre-line text-gray-700 leading-8">
+                                {instructions}
+                            </p>
+                        ) : (
+                            <p className="text-sm text-gray-400">ยังไม่มีคำอธิบายวิธีทำท่าสำหรับคำนี้</p>
+                        )}
                     </div>
-
                     <div className="flex justify-end">
                         <button
                             onClick={() => {
@@ -665,11 +666,10 @@ export default function Practice() {
                             <button
                                 onClick={() => setPracticeStarted((prev) => !prev)}
                                 disabled={isRecording || isComparing}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition disabled:opacity-50 ${
-                                    practiceStarted
-                                        ? "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                        : "bg-blue-600 text-white hover:bg-blue-700"
-                                }`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition disabled:opacity-50 ${practiceStarted
+                                    ? "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                    : "bg-blue-600 text-white hover:bg-blue-700"
+                                    }`}
                             >
                                 <span className={`w-2 h-2 rounded-full ${practiceStarted ? "bg-gray-400" : "bg-yellow-300"}`} />
                                 {practiceStarted ? "ปิดกล้อง" : "เปิดกล้อง"}
@@ -718,8 +718,8 @@ export default function Practice() {
                                         {isRecording
                                             ? "กำลังอัด..."
                                             : isComparing
-                                            ? "กำลังตรวจสอบ..."
-                                            : "เริ่มฝึกท่าทาง"}
+                                                ? "กำลังตรวจสอบ..."
+                                                : "เริ่มฝึกท่าทาง"}
                                     </button>
                                 </div>
 
@@ -747,9 +747,8 @@ export default function Practice() {
                                     </div>
                                 ) : compareResult ? (
                                     <div
-                                        className={`fade-in rounded-2xl p-5 border-2 text-center ${
-                                            compareResult.is_pass ? "border-green-200" : "border-red-200"
-                                        }`}
+                                        className={`fade-in rounded-2xl p-5 border-2 text-center ${compareResult.is_pass ? "border-green-200" : "border-red-200"
+                                            }`}
                                     >
                                         <div className="flex justify-center">
                                             <ScoreRing
@@ -759,11 +758,10 @@ export default function Practice() {
                                             />
                                         </div>
                                         <span
-                                            className={`inline-block px-3 py-1 rounded-full text-xs font-bold mt-4 mb-2 ${
-                                                compareResult.is_pass
-                                                    ? "bg-green-100 text-green-700"
-                                                    : "bg-red-100 text-red-600"
-                                            }`}
+                                            className={`inline-block px-3 py-1 rounded-full text-xs font-bold mt-4 mb-2 ${compareResult.is_pass
+                                                ? "bg-green-100 text-green-700"
+                                                : "bg-red-100 text-red-600"
+                                                }`}
                                         >
                                             {compareResult.is_pass ? "✓ ผ่านเกณฑ์แล้ว" : "✕ ยังไม่ผ่านเกณฑ์"}
                                         </span>

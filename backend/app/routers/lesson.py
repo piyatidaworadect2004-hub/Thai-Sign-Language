@@ -216,6 +216,7 @@ class LessonUpdate(BaseModel):
     category_id: Optional[int] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    instructions: Optional[str] = None   # ← เพิ่มบรรทัดนี้
     video_url: Optional[str] = None
     is_active: Optional[bool] = None
 
