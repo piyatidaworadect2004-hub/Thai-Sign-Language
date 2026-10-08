@@ -299,9 +299,9 @@ export default function Practice() {
                     await videoRef.current.play();
                 }
 
-                const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
-                );
+                // ใช้ไฟล์ WASM จาก public/wasm (คัดลอกมาจาก node_modules/@mediapipe/tasks-vision/wasm)
+                // เพื่อให้เวอร์ชันตรงกับ package ที่ติดตั้งเสมอ ไม่พึ่ง CDN
+                const vision = await FilesetResolver.forVisionTasks("/wasm");
 
                 if (!isMounted.current) return;
 
@@ -681,7 +681,7 @@ export default function Practice() {
                         </div>
 
                         <div className="grid gap-6 md:grid-cols-[3fr_2fr] md:items-start">
-                            {/* ซ้าย: กล้อง → ความใกล้เคียงแบบ real-time → ปุ่มฝึก → สถานะ */}
+                            {/* ซ้าย: กล้อง → ปุ่มฝึก → สถานะ */}
                             <div>
                                 <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-900">
                                     {practiceStarted ? (
