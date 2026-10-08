@@ -68,7 +68,6 @@ export default function Home() {
         <section className="max-w-7xl mx-auto pt-12 px-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold">เรียนต่อจากเดิม</h2>
-            <span className="text-sm text-gray-400">หมวดที่คุณเริ่มไว้แล้ว</span>
           </div>
 
           <div className="flex flex-wrap gap-6">
