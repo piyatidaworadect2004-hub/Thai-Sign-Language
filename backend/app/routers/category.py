@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Category, User
+from app.models import Category, User, UserProgress
 from app.schemas import CategoryBase, CategoryOut
 from app.routers.auth import get_current_user
 from app.routers.progress import _build_overview
@@ -88,6 +88,7 @@ def get_categories(
                     "category_id": lesson.category_id,
                     "title": lesson.title,
                     "description": lesson.description,
+                    "instructions": lesson.instructions,
                     "video_url": lesson.video_url,
                     "is_active": lesson.is_active,
                 }
@@ -132,6 +133,7 @@ def get_category(
                 "category_id": lesson.category_id,
                 "title": lesson.title,
                 "description": lesson.description,
+                "instructions": lesson.instructions,
                 "video_url": lesson.video_url,
                 "is_active": lesson.is_active,
             }
@@ -188,3 +190,28 @@ def update_category_description(
     db.commit()
     db.refresh(category)
     return {"id": category.id, "description": category.description}
+
+
+# ★ ลบหมวดหมู่ (เฉพาะแอดมิน) — คำศัพท์ในหมวดถูกลบตามอัตโนมัติ (cascade ใน model)
+@router.delete("/{category_id}", status_code=status.HTTP_200_OK)
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found",
+        )
+
+    # user_progress.category_id เป็น NOT NULL และ relationship ไม่มี cascade
+    # ต้องลบความคืบหน้าของหมวดนี้ก่อน ไม่งั้นลบหมวดหมู่ไม่ได้
+    db.query(UserProgress).filter(UserProgress.category_id == category_id).delete(
+        synchronize_session=False
+    )
+
+    db.delete(category)
+    db.commit()
+    return {"status": "success", "message": f"ลบหมวดหมู่ ID {category_id} เรียบร้อยแล้ว"}

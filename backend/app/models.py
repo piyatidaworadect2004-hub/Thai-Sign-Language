@@ -41,7 +41,7 @@ class Lesson(Base):
     category_id = Column(Integer, ForeignKey("category.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
-    # instructions = Column(Text, nullable=True)   # ★ เพิ่ม: วิธีทำท่า แสดงในหน้าวิดีโอ
+    instructions = Column(Text, nullable=True)   # ★ เพิ่ม: วิธีทำท่า แสดงในหน้าวิดีโอ
     video_url = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, default=False)   # ★ เพิ่ม: คำนี้ AI ตรวจจับได้จริงหรือยัง
 

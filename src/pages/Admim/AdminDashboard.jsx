@@ -226,6 +226,34 @@ export default function AdminDashboard() {
     }
   };
 
+  // ★ ลบหมวดหมู่ (DELETE /categories/{id}) — คำศัพท์ในหมวดและความคืบหน้าของผู้ใช้ถูกลบตามด้วย
+  const handleDeleteCategory = async (cat) => {
+    const lessonCount = lessons.filter((l) => l.category_id === cat.id).length;
+    const warning =
+      lessonCount > 0
+        ? `หมวดหมู่ "${cat.name}" มีคำศัพท์ ${lessonCount} คำ\nการลบจะลบคำศัพท์ทั้งหมดในหมวดนี้และความคืบหน้าของผู้ใช้ด้วย และกู้คืนไม่ได้\n\nต้องการลบใช่หรือไม่?`
+        : `ต้องการลบหมวดหมู่ "${cat.name}" ใช่หรือไม่?`;
+    if (!window.confirm(warning)) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://127.0.0.1:8000/categories/${cat.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        alert('ลบหมวดหมู่สำเร็จ');
+        fetchAllData();
+      } else {
+        alert(await readError(res, 'ลบหมวดหมู่ไม่สำเร็จ'));
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
+  };
+
   const handleViewUserProgress = async (userId, userLabel) => {
     try {
       const token = localStorage.getItem('token');
@@ -690,12 +718,20 @@ export default function AdminDashboard() {
                               ) : (
                                 <div className="flex items-start justify-between gap-3">
                                   <span>{cat.description || '-'}</span>
-                                  <button
-                                    onClick={() => startEditDescription(cat)}
-                                    className="shrink-0 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition whitespace-nowrap"
-                                  >
-                                    ✏️ แก้ไข
-                                  </button>
+                                  <div className="shrink-0 flex gap-2">
+                                    <button
+                                      onClick={() => startEditDescription(cat)}
+                                      className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition whitespace-nowrap"
+                                    >
+                                      ✏️ แก้ไข
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteCategory(cat)}
+                                      className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition whitespace-nowrap"
+                                    >
+                                      🗑 ลบ
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </td>
@@ -920,7 +956,7 @@ export default function AdminDashboard() {
                       ['ผู้ดูแลระบบ', `${adminCount} คน`],
                       ['หมวดหมู่บทเรียน', `${categories.length} หมวด`],
                       ['คำศัพท์ที่เปิดใช้งาน', `${activeLessonCount}/${lessons.length} คำ (${activeLessonPct}%)`],
-                      ['หมวดหมู่ที่มีคำศัพท์มากที่สุด', topCategory ? `${topCategory.name} (${lessonCountByCategory(topCategory.id)} คำ)` : '-'],
+                  
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-4 py-3">
                         <dt className="text-gray-500">{label}</dt>
