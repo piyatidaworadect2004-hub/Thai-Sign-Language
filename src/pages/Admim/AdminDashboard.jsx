@@ -623,15 +623,7 @@ export default function AdminDashboard() {
                     </select>
                   </Field>
                 </div>
-                <Field label="คำอธิบายหมวดหมู่" className="mt-4">
-                  <textarea
-                    placeholder="คำอธิบายหมวดหมู่ (ไม่บังคับ)"
-                    value={newCategoryDescription}
-                    onChange={(e) => setNewCategoryDescription(e.target.value)}
-                    rows={2}
-                    className={INPUT}
-                  />
-                </Field>
+              
                 <div className="flex justify-end gap-2 mt-4">
                   <button
                     onClick={() => {
@@ -794,7 +786,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className={`${CARD} p-5`}>
                       <p className="text-2xl font-bold text-gray-900">{reportAvgCorrectness}%</p>
-                      <p className="text-xs text-gray-500 mt-1">ความแม่นยำเฉลี่ย (เฉพาะหมวดที่ฝึกแล้ว)</p>
+                      <p className="text-xs text-gray-500 mt-1">ค่าความใกล้เคียง(เฉพาะหมวดที่ฝึกแล้ว)</p>
                     </div>
                   </div>
 
@@ -811,7 +803,7 @@ export default function AdminDashboard() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_CORRECTNESS }} />
-                          ความแม่นยำเฉลี่ย (%)
+                          ค่าความใกล้เคียง (%)
                         </span>
                       </div>
                     </div>
@@ -821,7 +813,7 @@ export default function AdminDashboard() {
                       <svg
                         viewBox={`0 0 560 ${28 + reports.length * 56 + 8}`}
                         role="img"
-                        aria-label={`กราฟความคืบหน้าและความแม่นยำเฉลี่ยของ ${selectedUserLabel || 'ผู้ใช้'} แยกตามหมวดหมู่`}
+                        aria-label={`กราฟความคืบหน้าและค่าความใกล้เคียง ${selectedUserLabel || 'ผู้ใช้'} แยกตามหมวดหมู่`}
                         className="w-full"
                         style={{ minWidth: 480 }}
                       >
@@ -857,7 +849,7 @@ export default function AdminDashboard() {
                           return (
                             <g key={r.category_id}>
                               <title>
-                                {r.category_name}: ความคืบหน้า {completion}%, ความแม่นยำเฉลี่ย {correctness}%
+                                {r.category_name}: ความคืบหน้า {completion}%, ค่าความใกล้เคียง {correctness}%
                               </title>
                               <text x={leftX - 10} y={groupCenter} textAnchor="end" dominantBaseline="middle" fontSize="12" fill="#374151">
                                 {r.category_name}
@@ -884,7 +876,7 @@ export default function AdminDashboard() {
                             <th className={TH}>หมวดหมู่</th>
                             <th className={TH}>ฝึกไปแล้ว</th>
                             <th className={TH}>ความคืบหน้า</th>
-                            <th className={TH}>ความแม่นยำเฉลี่ย</th>
+                            <th className={TH}>ค่าความใกล้เคียง</th>
                           </tr>
                         </thead>
                         <tbody>

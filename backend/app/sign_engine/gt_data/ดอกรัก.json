@@ -1,0 +1,23 @@
+{
+  "label": "ดอกรัก",
+  "num_samples": 6,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "IMG_4230.MOV",
+    "IMG_4231.MOV",
+    "IMG_4232.MOV",
+    "IMG_4230.MOV",
+    "IMG_4231.MOV",
+    "IMG_4232.MOV"
+  ],
+  "frames_per_sample": [
+    100,
+    107,
+    111,
+    100,
+    107,
+    111
+  ]
+}
