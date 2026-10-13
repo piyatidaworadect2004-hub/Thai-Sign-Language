@@ -573,16 +573,6 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
                 className={INPUT}
               />
             </Field>
-            <Field label="วิธีฝึกท่าทางภาษามือ (แสดงในหน้าวิดีโอ)">
-              <textarea
-                rows={4}
-                placeholder={'1. ยกมือทั้งสองข้างระดับอก\n2. ...'}
-                value={panel.instructions}
-                onChange={(e) => updatePanel({ instructions: e.target.value })}
-                disabled={busy}
-                className={INPUT}
-              />
-            </Field>
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-semibold text-gray-600">วิดีโอตัวอย่างท่า (ท่าต้นแบบ)</span>

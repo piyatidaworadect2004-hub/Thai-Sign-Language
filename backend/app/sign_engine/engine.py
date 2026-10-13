@@ -331,9 +331,7 @@ def list_ground_truth_info() -> list:
     return items
 
 
-# 🔑 CORE: เลือกคะแนนที่ดีที่สุดจากตัวอย่าง Ground Truth ทุกตัว
-# ทำไม: คำเดียวกันทำท่าได้หลายแบบเล็กน้อย (มุมกล้อง/สไตล์คนละคน) ถ้ามี Ground Truth
-# หลายตัวอย่าง ผู้ใช้ควรผ่านถ้าทำเหมือน "ตัวอย่างใดตัวอย่างหนึ่ง" ก็พอ ไม่ต้องเหมือนทุกตัว
+# เงื่อนไขตัดสินสถานะผ่าน/ไม่ผ่านของผู้ใช้กับคำศัพท์แต่ละคำ (DTW score <= threshold = ผ่าน)
 def compare_to_word(user_feature_matrix: np.ndarray, word: str, threshold: float = DEFAULT_THRESHOLD) -> dict:
     feature_matrices = load_ground_truth_matrices(word)
 
@@ -344,7 +342,7 @@ def compare_to_word(user_feature_matrix: np.ndarray, word: str, threshold: float
 
     best_score = min(scores)
     best_idx = int(np.argmin(scores))
-    is_pass = best_score <= threshold
+    is_pass = best_score <= threshold  # ตัดสินผ่าน/ไม่ผ่านตามเกณฑ์ threshold
 
     return {
         "word": word,
