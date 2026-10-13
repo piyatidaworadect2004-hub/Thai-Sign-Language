@@ -573,6 +573,10 @@ export default function LessonManager({ lessons, setLessons, categories, onRefre
                 className={INPUT}
               />
             </Field>
+<<<<<<< HEAD
+=======
+            
+>>>>>>> 65cc27f8c462bb78e5cebb565be1657adbe180eb
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-semibold text-gray-600">วิดีโอตัวอย่างท่า (ท่าต้นแบบ)</span>

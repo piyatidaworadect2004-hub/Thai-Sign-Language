@@ -623,15 +623,7 @@ export default function AdminDashboard() {
                     </select>
                   </Field>
                 </div>
-                <Field label="คำอธิบายหมวดหมู่" className="mt-4">
-                  <textarea
-                    placeholder="คำอธิบายหมวดหมู่ (ไม่บังคับ)"
-                    value={newCategoryDescription}
-                    onChange={(e) => setNewCategoryDescription(e.target.value)}
-                    rows={2}
-                    className={INPUT}
-                  />
-                </Field>
+              
                 <div className="flex justify-end gap-2 mt-4">
                   <button
                     onClick={() => {
@@ -794,7 +786,11 @@ export default function AdminDashboard() {
                     </div>
                     <div className={`${CARD} p-5`}>
                       <p className="text-2xl font-bold text-gray-900">{reportAvgCorrectness}%</p>
+<<<<<<< HEAD
                       <p className="text-xs text-gray-500 mt-1">ค่าความใกล้เคียง (เฉพาะหมวดที่ฝึกแล้ว)</p>
+=======
+                      <p className="text-xs text-gray-500 mt-1">ค่าความใกล้เคียง(เฉพาะหมวดที่ฝึกแล้ว)</p>
+>>>>>>> 65cc27f8c462bb78e5cebb565be1657adbe180eb
                     </div>
                   </div>
 
@@ -821,7 +817,11 @@ export default function AdminDashboard() {
                       <svg
                         viewBox={`0 0 560 ${28 + reports.length * 56 + 8}`}
                         role="img"
+<<<<<<< HEAD
                         aria-label={`กราฟความคืบหน้าและค่าความใกล้เคียงของ ${selectedUserLabel || 'ผู้ใช้'} แยกตามหมวดหมู่`}
+=======
+                        aria-label={`กราฟความคืบหน้าและค่าความใกล้เคียง ${selectedUserLabel || 'ผู้ใช้'} แยกตามหมวดหมู่`}
+>>>>>>> 65cc27f8c462bb78e5cebb565be1657adbe180eb
                         className="w-full"
                         style={{ minWidth: 480 }}
                       >

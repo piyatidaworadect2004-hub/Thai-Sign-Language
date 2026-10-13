@@ -1,3 +1,5 @@
+// หน้าฝึก กับท่าภาษามือ และดูตัวอย่างภาษามือ
+
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
@@ -13,7 +15,7 @@ const HAND_CONNECTIONS = [
     [0, 17]
 ];
 
-const RECORD_DURATION_MS = 3000;
+const RECORD_DURATION_MS = 3000;       //อัดวิดีโอฝึก  วินาทีละ 3 วินาที (3000 ms) เพื่อส่งไปเปรียบเทียบกับวิดีโอตัวอย่าง
 const PREDICT_WINDOW_MS = 3000;       // เก็บ buffer ย้อนหลังกี่ ms เพื่อส่งไปเทียบ real-time
 const BUFFER_PUSH_INTERVAL_MS = 100;  // ความถี่เก็บเฟรมเข้า buffer (~10fps พอสำหรับ DTW)
 
@@ -159,6 +161,10 @@ export default function Practice() {
         setCompareError("");
     }, [id]);
 
+//ประเมินผลระหว่างฝึก ส่ง landmarks ไปที่ POST /predict ทุกประมาณ 500 มิลลิวินาที 
+// แล้วอัปเดตคำทำนายและ confidence บนหน้าเว็บ การประเมินนี้มีไว้แสดงผลทันทีระหว่างฝึก
+
+
     async function predictSign(frames) {
         if (!frames.length) return;
         if (!targetWord) return;
@@ -280,6 +286,9 @@ export default function Practice() {
         let currentStream = null;
         let localHandDetected = false;
         frameBufferRef.current = [];
+
+        
+//ตรวจจับท่าทางต่อเนื่อง ในลูปตรวจจับ ระบบวาดตำแหน่งมือบนภาพและรวบรวม landmarks ของมือกับ pose เพื่อใช้วิเคราะห์ท่า
 
         async function setup() {
             try {
@@ -771,7 +780,7 @@ export default function Practice() {
                                         </span>
                                         <h3 className="text-base font-bold text-gray-800">
                                             {compareResult.is_pass
-                                                ? "เยี่ยมมาก! ท่าภาษามือของคุณใกล้เคียงกับวิดีโอตัวอย่างมาก"
+                                                ? "เยี่ยม ท่าภาษามือของคุณใกล้เคียงกับวิดีโอตัวอย่าง"
                                                 : "ยังไม่ผ่าน ดูวิดีโอตัวอย่างแล้วบันทึกท่าภาษามืออีกครั้ง"}
                                         </h3>
                                         {/* ผ่านเมื่อ best_score <= threshold ซึ่งตามสูตรแปลง % ใน backend ตรงกับ 50% พอดี */}

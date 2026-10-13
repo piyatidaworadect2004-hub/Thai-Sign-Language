@@ -1,0 +1,13 @@
+{
+  "label": "แสตมป์",
+  "num_samples": 1,
+  "feature_dim": 36,
+  "feature_version": 1,
+  "frame_skip": 2,
+  "source_files": [
+    "ภาษามือไทยขั้นพื้นฐาน (THsl Basic#04).mp4"
+  ],
+  "frames_per_sample": [
+    1184
+  ]
+}

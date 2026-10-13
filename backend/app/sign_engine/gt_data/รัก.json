@@ -1,17 +1,19 @@
 {
   "label": "รัก",
-  "num_samples": 3,
+  "num_samples": 4,
   "feature_dim": 36,
   "feature_version": 1,
   "frame_skip": 2,
   "source_files": [
     "IMG_4266.MOV",
     "IMG_4267.MOV",
-    "IMG_4268.MOV"
+    "IMG_4268.MOV",
+    "ภาษามือไทยขั้นพื้นฐาน (THsl Basic#04).mp4"
   ],
   "frames_per_sample": [
     69,
     75,
-    65
+    65,
+    1184
   ]
 }
